@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "155728072349",
+    "project_id": "odertainha",
+    "storage_bucket": "odertainha.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:155728072349:android:2948084ce8b5df70fc8e74",
+        "android_client_info": {
+          "package_name": "com.example.testappcc"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA9-s7XgpYl87dbb35b52qFMvRSAex2JmM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
