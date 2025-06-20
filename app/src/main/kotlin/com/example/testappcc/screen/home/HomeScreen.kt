@@ -40,6 +40,7 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavHostController
 import coil.compose.AsyncImage
 import com.example.testappcc.presentation.components.ServiceTypeItem
 import com.example.testappcc.presentation.viewmodel.HomeViewModel
@@ -48,7 +49,8 @@ import com.example.testappcc.presentation.viewmodel.HomeViewModel
 @Composable
 fun HomeScreen(
     onLogout: () -> Unit,
-    viewModel: HomeViewModel = viewModel()
+    viewModel: HomeViewModel = viewModel(),
+    navController: NavHostController
 ) {
     var expanded by remember { mutableStateOf(false) }
     val context = LocalContext.current
@@ -141,6 +143,11 @@ fun HomeScreen(
                                 .padding(horizontal = 16.dp, vertical = 4.dp)
                                 .clip(RoundedCornerShape(8.dp))
                                 .background(MaterialTheme.colorScheme.surfaceVariant)
+                                .clickable {
+                                    navController.navigate(
+                                        "service_detail/${service.name}/${service.description ?: ""}/${service.durationMinutes ?: 0}/${service.id}"
+                                    )
+                                }
                         )
                     }
                 }

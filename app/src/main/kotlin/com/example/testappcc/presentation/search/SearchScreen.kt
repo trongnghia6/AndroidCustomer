@@ -5,7 +5,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.example.testappcc.data.model.Users
+import com.example.testappcc.data.model.User
 import com.example.testappcc.core.supabase
 import io.github.jan.supabase.postgrest.postgrest
 import kotlinx.coroutines.CoroutineScope
@@ -57,7 +57,7 @@ private fun fetchUsersByName(name: String, onResult: (String) -> Unit) {
                 .rpc("get_users_by_name", parameters = buildJsonObject {
                     put("search_name", name)
                 })
-                .decodeAs<List<Users>>()
+                .decodeAs<List<User>>()
             onResult(response.joinToString("\n") { user ->
                 "${user.email} (${user.role})${user.username?.let { " - $it" } ?: ""}"
             })

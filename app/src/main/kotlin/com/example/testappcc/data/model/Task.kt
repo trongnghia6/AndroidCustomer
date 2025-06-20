@@ -39,7 +39,7 @@ data class TaskRaw(
     val time: String? = null
 )
 @Serializable
-data class Booking(
+data class BookingDetail(
     val id: Int,
     val bookingDate: String,
     val providers: Provider,
@@ -115,7 +115,7 @@ class TaskViewModel(private val userId: String) : ViewModel() {
                 .from("bookings")
                 .select(
                     columns = Columns.list("*, providers(*), customers(*), services(*, service_types(*))")
-                ).decodeList<Booking>()
+                ).decodeList<BookingDetail>()
 
         }
     }
