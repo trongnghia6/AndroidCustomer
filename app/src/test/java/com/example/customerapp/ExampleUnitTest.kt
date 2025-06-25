@@ -1,4 +1,4 @@
-package com.example.testappcc
+package com.example.customerapp
 
 import org.junit.Test
 

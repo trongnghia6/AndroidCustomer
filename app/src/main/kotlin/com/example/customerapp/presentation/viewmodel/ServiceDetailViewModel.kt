@@ -1,12 +1,12 @@
-package com.example.testappcc.presentation.viewmodel
+package com.example.customerapp.presentation.viewmodel
 
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.testappcc.data.model.ProviderService
-import com.example.testappcc.data.repository.ProviderServiceRepository
+import com.example.customerapp.data.model.ProviderService
+import com.example.customerapp.data.repository.ProviderServiceRepository
 import kotlinx.coroutines.launch
 
 class ServiceDetailViewModel(

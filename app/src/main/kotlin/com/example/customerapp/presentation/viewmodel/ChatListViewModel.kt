@@ -1,4 +1,4 @@
-package com.example.testappcc.presentation.viewmodel
+package com.example.customerapp.presentation.viewmodel
 
 import android.content.Context
 import androidx.compose.runtime.getValue
@@ -6,9 +6,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.testappcc.data.model.Conversation
-import com.example.testappcc.data.model.User
-import com.example.testappcc.data.repository.ChatRepository
+import com.example.customerapp.data.model.Conversation
+import com.example.customerapp.data.model.User
+import com.example.customerapp.data.repository.ChatRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay

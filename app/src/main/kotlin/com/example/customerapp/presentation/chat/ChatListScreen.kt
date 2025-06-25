@@ -1,4 +1,4 @@
-package com.example.testappcc.presentation.chat
+package com.example.customerapp.presentation.chat
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -27,9 +27,9 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
-import com.example.testappcc.data.model.Conversation
-import com.example.testappcc.data.model.User
-import com.example.testappcc.presentation.viewmodel.ChatListViewModel
+import com.example.customerapp.data.model.Conversation
+import com.example.customerapp.data.model.User
+import com.example.customerapp.presentation.viewmodel.ChatListViewModel
 import java.time.OffsetDateTime
 import java.time.format.DateTimeFormatter
 

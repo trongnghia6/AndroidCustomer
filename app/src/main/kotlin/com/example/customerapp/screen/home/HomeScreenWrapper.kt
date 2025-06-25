@@ -1,4 +1,4 @@
-package com.example.testappcc.screen.home
+package com.example.customerapp.screen.home
 
 import android.content.Context
 import android.util.Log
@@ -23,14 +23,14 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.runtime.remember
-import com.example.testappcc.presentation.BottomNavItem
-import com.example.testappcc.presentation.viewmodel.HomeViewModel
-import com.example.testappcc.presentation.orders.OrdersScreen
-import com.example.testappcc.presentation.chat.ChatScreen
-import com.example.testappcc.presentation.chat.ChatListScreen
-import com.example.testappcc.presentation.checkout.OrderConfirmScreen
-import com.example.testappcc.data.model.User
-import com.example.testappcc.core.supabase
+import com.example.customerapp.presentation.BottomNavItem
+import com.example.customerapp.presentation.viewmodel.HomeViewModel
+import com.example.customerapp.presentation.orders.OrdersScreen
+import com.example.customerapp.presentation.chat.ChatScreen
+import com.example.customerapp.presentation.chat.ChatListScreen
+import com.example.customerapp.presentation.checkout.OrderConfirmScreen
+import com.example.customerapp.data.model.User
+import com.example.customerapp.core.supabase
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -38,12 +38,12 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.navigation.NavType
 import androidx.navigation.navArgument
-import com.example.testappcc.core.network.RetrofitClient
-import com.example.testappcc.presentation.orders.OrderDetailScreen
-import com.example.testappcc.presentation.service.ProviderDetailScreen
-import com.example.testappcc.presentation.service.ServiceDetailScreen
-import com.example.testappcc.presentation.userprofile.UserProfileScreen
-import com.example.testappcc.presentation.viewmodel.OrderViewModel
+import com.example.customerapp.core.network.RetrofitClient
+import com.example.customerapp.presentation.orders.OrderDetailScreen
+import com.example.customerapp.presentation.service.ProviderDetailScreen
+import com.example.customerapp.presentation.service.ServiceDetailScreen
+import com.example.customerapp.presentation.userprofile.UserProfileScreen
+import com.example.customerapp.presentation.viewmodel.OrderViewModel
 import io.github.jan.supabase.postgrest.from
 
 @Composable

@@ -1,4 +1,4 @@
-package com.example.testappcc.data.model
+package com.example.customerapp.data.model
 
 import com.mapbox.api.directions.v5.DirectionsCriteria
 import com.mapbox.api.directions.v5.MapboxDirections

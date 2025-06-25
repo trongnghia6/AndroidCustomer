@@ -1,4 +1,4 @@
-package com.example.testappcc.presentation.viewmodel
+package com.example.customerapp.presentation.viewmodel
 
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
@@ -6,9 +6,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.testappcc.core.supabase
-import com.example.testappcc.data.model.Service
-import com.example.testappcc.data.model.ServiceType
+import com.example.customerapp.core.supabase
+import com.example.customerapp.data.model.Service
+import com.example.customerapp.data.model.ServiceType
 import io.github.jan.supabase.postgrest.from
 import kotlinx.coroutines.launch
 

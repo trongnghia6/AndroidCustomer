@@ -1,4 +1,4 @@
-package com.example.testappcc.presentation.search
+package com.example.customerapp.presentation.search
 
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -11,7 +11,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
-import com.example.testappcc.data.model.MapboxSearchState
+import com.example.customerapp.data.model.MapboxSearchState
 
 @Composable
 fun AddressAutoComplete(

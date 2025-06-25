@@ -1,11 +1,10 @@
-package com.example.testappcc.presentation.viewmodel
+package com.example.customerapp.presentation.viewmodel
 
 import androidx.lifecycle.ViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import com.example.testappcc.data.model.Order
-import com.example.testappcc.data.model.OrderItem
-import kotlinx.coroutines.flow.update
+import com.example.customerapp.data.model.Order
+import com.example.customerapp.data.model.OrderItem
 
 class OrderViewModel : ViewModel() {
     private val _order = MutableStateFlow<Order?>(null)

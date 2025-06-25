@@ -1,7 +1,6 @@
-package com.example.testappcc.presentation.service
+package com.example.customerapp.presentation.service
 
 import android.annotation.SuppressLint
-import android.content.Context
 import android.content.pm.PackageManager
 import android.location.Location
 import android.util.Log
@@ -38,13 +37,13 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
-import com.example.testappcc.BuildConfig
-import com.example.testappcc.core.network.RetrofitClient
-import com.example.testappcc.core.supabase
-import com.example.testappcc.data.model.ProviderService
-import com.example.testappcc.data.model.Review
-import com.example.testappcc.data.repository.ProviderServiceRepository
-import com.example.testappcc.presentation.viewmodel.ServiceDetailViewModel
+import com.example.customerapp.BuildConfig
+import com.example.customerapp.core.network.RetrofitClient
+import com.example.customerapp.core.supabase
+import com.example.customerapp.data.model.ProviderService
+import com.example.customerapp.data.model.Review
+import com.example.customerapp.data.repository.ProviderServiceRepository
+import com.example.customerapp.presentation.viewmodel.ServiceDetailViewModel
 import com.google.android.gms.location.LocationServices
 import io.github.jan.supabase.postgrest.from
 import kotlinx.coroutines.CoroutineScope

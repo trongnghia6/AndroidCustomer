@@ -1,4 +1,4 @@
-package com.example.testappcc.presentation.viewmodel
+package com.example.customerapp.presentation.viewmodel
 
 import android.content.Context
 import android.net.Uri
@@ -7,9 +7,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.testappcc.data.model.User
-import com.example.testappcc.data.repository.AvatarRepository
-import com.example.testappcc.core.supabase
+import com.example.customerapp.data.model.User
+import com.example.customerapp.data.repository.AvatarRepository
+import com.example.customerapp.core.supabase
 import io.github.jan.supabase.postgrest.from
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch

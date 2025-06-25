@@ -1,4 +1,4 @@
-package com.example.testappcc.data.model
+package com.example.customerapp.data.model
 
 data class OrderItem(
     val name: String,

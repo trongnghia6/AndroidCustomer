@@ -1,4 +1,4 @@
-package com.example.testappcc.presentation
+package com.example.customerapp.presentation
 
 import androidx.compose.ui.graphics.vector.ImageVector
 

@@ -1,4 +1,4 @@
-package com.example.testappcc.presentation.avatar
+package com.example.customerapp.presentation.avatar
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -11,8 +11,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
-import com.example.testappcc.presentation.components.AvatarEditor
-import com.example.testappcc.presentation.viewmodel.AvatarViewModel
+import com.example.customerapp.presentation.components.AvatarEditor
+import com.example.customerapp.presentation.viewmodel.AvatarViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

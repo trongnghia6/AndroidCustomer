@@ -1,4 +1,4 @@
-package com.example.testappcc.data.model
+package com.example.customerapp.data.model
 
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
@@ -9,10 +9,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import com.example.testappcc.BuildConfig
-import com.example.testappcc.core.network.MapboxGeocodingService
-import com.example.testappcc.core.network.MapboxPlace
-import com.example.testappcc.presentation.search.AddressAutoComplete
+import com.example.customerapp.BuildConfig
+import com.example.customerapp.core.network.MapboxGeocodingService
+import com.example.customerapp.core.network.MapboxPlace
+import com.example.customerapp.presentation.search.AddressAutoComplete
 
 
 @Composable

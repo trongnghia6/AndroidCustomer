@@ -1,4 +1,4 @@
-package com.example.testappcc.core
+package com.example.customerapp.core
 
 import io.github.jan.supabase.annotations.SupabaseInternal
 import io.github.jan.supabase.createSupabaseClient

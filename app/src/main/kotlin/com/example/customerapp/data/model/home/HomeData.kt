@@ -1,4 +1,4 @@
-package com.example.testappcc.data.model.home
+package com.example.customerapp.data.model.home
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -6,8 +6,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import com.example.testappcc.data.model.Item
-import com.example.testappcc.core.supabase
+import com.example.customerapp.data.model.Item
+import com.example.customerapp.core.supabase
 import io.github.jan.supabase.postgrest.from
 import io.github.jan.supabase.postgrest.query.Columns
 

@@ -1,12 +1,12 @@
-package com.example.testappcc.presentation.search
+package com.example.customerapp.presentation.search
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.example.testappcc.data.model.User
-import com.example.testappcc.core.supabase
+import com.example.customerapp.data.model.User
+import com.example.customerapp.core.supabase
 import io.github.jan.supabase.postgrest.postgrest
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers

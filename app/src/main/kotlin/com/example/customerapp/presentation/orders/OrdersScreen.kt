@@ -1,4 +1,4 @@
-package com.example.testappcc.presentation.orders
+package com.example.customerapp.presentation.orders
 
 import android.content.Context
 import androidx.compose.foundation.background
@@ -22,11 +22,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.testappcc.core.supabase
-import com.example.testappcc.data.model.Booking
-import com.example.testappcc.data.model.Review
-import com.example.testappcc.data.model.ReviewInsert
-import com.example.testappcc.data.repository.ProviderServiceRepository
+import com.example.customerapp.core.supabase
+import com.example.customerapp.data.model.Booking
+import com.example.customerapp.data.model.Review
+import com.example.customerapp.data.model.ReviewInsert
+import com.example.customerapp.data.repository.ProviderServiceRepository
 import io.github.jan.supabase.postgrest.from
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers

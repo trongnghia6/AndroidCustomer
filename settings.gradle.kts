@@ -31,6 +31,6 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "TestAppCC"
+rootProject.name = "CustomerApp"
 include(":app")
  

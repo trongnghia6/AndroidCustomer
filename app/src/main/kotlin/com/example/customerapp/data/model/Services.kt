@@ -1,6 +1,6 @@
-package com.example.testappcc.data.model
+package com.example.customerapp.data.model
 
-import com.example.testappcc.core.supabase
+import com.example.customerapp.core.supabase
 import io.github.jan.supabase.postgrest.from
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable

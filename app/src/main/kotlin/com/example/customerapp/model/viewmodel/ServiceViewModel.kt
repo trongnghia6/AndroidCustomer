@@ -1,12 +1,12 @@
-package com.example.testappcc.model.viewmodel
+package com.example.customerapp.model.viewmodel
 
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.testappcc.data.model.ServiceType
+import com.example.customerapp.data.model.ServiceType
 import kotlinx.coroutines.launch
 import androidx.compose.runtime.*
-import com.example.testappcc.data.model.ServiceTypeRepository
+import com.example.customerapp.data.model.ServiceTypeRepository
 
 class ServiceViewModel(
     private val repository: ServiceTypeRepository = ServiceTypeRepository()

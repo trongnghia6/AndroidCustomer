@@ -1,9 +1,9 @@
-package com.example.testappcc.data.model
+package com.example.customerapp.data.model
 
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.testappcc.core.supabase
+import com.example.customerapp.core.supabase
 import io.github.jan.supabase.postgrest.from
 import io.github.jan.supabase.postgrest.query.Columns
 import kotlinx.coroutines.flow.MutableStateFlow

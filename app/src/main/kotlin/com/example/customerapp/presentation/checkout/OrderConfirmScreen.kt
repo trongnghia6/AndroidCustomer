@@ -1,4 +1,4 @@
-package com.example.testappcc.presentation.checkout
+package com.example.customerapp.presentation.checkout
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -25,15 +25,15 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import com.example.testappcc.core.supabase
+import com.example.customerapp.core.supabase
 import io.github.jan.supabase.postgrest.from
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import com.example.testappcc.data.model.BookingInsert
-import com.example.testappcc.data.model.BookingResponse
-import com.example.testappcc.data.model.Transaction
+import com.example.customerapp.data.model.BookingInsert
+import com.example.customerapp.data.model.BookingResponse
+import com.example.customerapp.data.model.Transaction
 import io.github.jan.supabase.postgrest.postgrest
 import java.time.*
 import java.time.format.DateTimeFormatter

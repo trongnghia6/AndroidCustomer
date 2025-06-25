@@ -1,4 +1,4 @@
-package com.example.testappcc.presentation.home
+package com.example.customerapp.presentation.home
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -12,7 +12,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.testappcc.data.model.Task
+import com.example.customerapp.data.model.Task
 import com.kizitonwose.calendar.compose.HorizontalCalendar
 import com.kizitonwose.calendar.compose.rememberCalendarState
 import com.kizitonwose.calendar.core.DayPosition
@@ -22,7 +22,7 @@ import java.time.LocalDate
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
-import com.example.testappcc.screen.TaskListByDate
+import com.example.customerapp.screen.TaskListByDate
 
 @Composable
 fun CalendarView(tasksByDate: Map<LocalDate, List<Task>>) {

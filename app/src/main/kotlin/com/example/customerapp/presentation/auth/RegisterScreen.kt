@@ -1,4 +1,4 @@
-package com.example.testappcc.presentation.auth
+package com.example.customerapp.presentation.auth
 
 import android.Manifest
 import android.content.Context
@@ -17,7 +17,6 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
-import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -32,12 +31,12 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.testappcc.BuildConfig
-import com.example.testappcc.core.network.MapboxPlace
-import com.example.testappcc.model.viewmodel.AuthViewModel
+import com.example.customerapp.BuildConfig
+import com.example.customerapp.core.network.MapboxPlace
+import com.example.customerapp.model.viewmodel.AuthViewModel
 import kotlinx.coroutines.launch
 import androidx.core.content.ContextCompat
-import com.example.testappcc.core.network.MapboxGeocodingService
+import com.example.customerapp.core.network.MapboxGeocodingService
 import com.google.android.gms.location.LocationCallback
 import com.google.android.gms.location.LocationRequest
 import com.google.android.gms.location.LocationResult

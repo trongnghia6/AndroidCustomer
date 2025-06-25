@@ -1,4 +1,4 @@
-package com.example.testappcc.presentation.components
+package com.example.customerapp.presentation.components
 
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -26,7 +26,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
-import com.example.testappcc.presentation.viewmodel.AvatarViewModel
+import com.example.customerapp.presentation.viewmodel.AvatarViewModel
 
 @Composable
 fun AvatarEditor(

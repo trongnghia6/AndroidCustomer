@@ -1,4 +1,4 @@
-package com.example.testappcc.screen
+package com.example.customerapp.screen
 
 import androidx.compose.runtime.Composable
 import androidx.compose.foundation.background
@@ -10,7 +10,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.testappcc.data.model.Task
+import com.example.customerapp.data.model.Task
 import java.time.LocalDate
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items

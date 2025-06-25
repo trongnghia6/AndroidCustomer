@@ -1,4 +1,4 @@
-package com.example.testappcc.presentation.userprofile
+package com.example.customerapp.presentation.userprofile
 
 import android.content.Context
 import androidx.compose.foundation.layout.Arrangement
@@ -51,15 +51,15 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.navigation.NavController
-import com.example.testappcc.BuildConfig
-import com.example.testappcc.core.network.MapboxPlace
+import com.example.customerapp.BuildConfig
+import com.example.customerapp.core.network.MapboxPlace
 import kotlinx.coroutines.launch
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.core.content.ContextCompat
-import com.example.testappcc.core.network.MapboxGeocodingService
-import com.example.testappcc.presentation.auth.getCurrentLocationAndUpdateAddress
+import com.example.customerapp.core.network.MapboxGeocodingService
+import com.example.customerapp.presentation.auth.getCurrentLocationAndUpdateAddress
 
 
 @Composable

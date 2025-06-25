@@ -1,4 +1,4 @@
-package com.example.testappcc.utils
+package com.example.customerapp.utils
 
 
 import android.location.Location

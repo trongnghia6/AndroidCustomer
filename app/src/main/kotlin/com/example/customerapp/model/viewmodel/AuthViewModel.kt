@@ -1,4 +1,4 @@
-package com.example.testappcc.model.viewmodel
+package com.example.customerapp.model.viewmodel
 
 import android.content.Context
 import androidx.compose.runtime.getValue
@@ -9,7 +9,7 @@ import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import com.example.testappcc.core.supabase
+import com.example.customerapp.core.supabase
 import android.util.Log
 import io.github.jan.supabase.postgrest.from
 import io.github.jan.supabase.postgrest.query.Columns

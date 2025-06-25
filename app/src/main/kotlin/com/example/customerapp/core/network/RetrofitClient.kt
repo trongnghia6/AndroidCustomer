@@ -1,4 +1,4 @@
-package com.example.testappcc.core.network
+package com.example.customerapp.core.network
 
 import okhttp3.OkHttpClient
 import retrofit2.Retrofit

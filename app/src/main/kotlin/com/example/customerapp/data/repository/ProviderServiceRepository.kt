@@ -1,7 +1,7 @@
-package com.example.testappcc.data.repository
+package com.example.customerapp.data.repository
 
-import com.example.testappcc.core.supabase
-import com.example.testappcc.data.model.ProviderService
+import com.example.customerapp.core.supabase
+import com.example.customerapp.data.model.ProviderService
 import io.github.jan.supabase.postgrest.from
 import io.github.jan.supabase.postgrest.query.Columns
 

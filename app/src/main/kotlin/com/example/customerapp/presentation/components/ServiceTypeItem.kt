@@ -1,4 +1,4 @@
-package com.example.testappcc.presentation.components
+package com.example.customerapp.presentation.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -12,7 +12,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
-import com.example.testappcc.data.model.ServiceType
+import com.example.customerapp.data.model.ServiceType
 
 @Composable
 fun ServiceTypeItem(serviceType: ServiceType, onClick: () -> Unit = {}) {

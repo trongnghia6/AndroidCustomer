@@ -1,4 +1,4 @@
-package com.example.testappcc.presentation.userprofile
+package com.example.customerapp.presentation.userprofile
 
 
 import androidx.compose.runtime.getValue
@@ -6,8 +6,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.testappcc.core.supabase
-import com.example.testappcc.data.model.User
+import com.example.customerapp.core.supabase
+import com.example.customerapp.data.model.User
 import io.github.jan.supabase.postgrest.from
 import io.github.jan.supabase.postgrest.query.Columns
 import kotlinx.coroutines.launch

@@ -1,4 +1,4 @@
-package com.example.testappcc.presentation.auth
+package com.example.customerapp.presentation.auth
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -8,7 +8,6 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Login
 import androidx.compose.material.icons.filled.*
-import androidx.compose.material.icons.filled.Login
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -23,7 +22,7 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.testappcc.model.viewmodel.AuthViewModel
+import com.example.customerapp.model.viewmodel.AuthViewModel
 
 @Composable
 fun LoginScreen(

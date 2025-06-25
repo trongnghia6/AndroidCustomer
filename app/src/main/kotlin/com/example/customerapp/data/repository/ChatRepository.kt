@@ -1,13 +1,12 @@
-package com.example.testappcc.data.repository
+package com.example.customerapp.data.repository
 
 import android.util.Log
-import com.example.testappcc.core.supabase
-import com.example.testappcc.data.model.Conversation
-import com.example.testappcc.data.model.Message
-import com.example.testappcc.data.model.User
+import com.example.customerapp.core.supabase
+import com.example.customerapp.data.model.Conversation
+import com.example.customerapp.data.model.Message
+import com.example.customerapp.data.model.User
 import io.github.jan.supabase.postgrest.from
 import io.github.jan.supabase.postgrest.query.Order
-import io.github.jan.supabase.postgrest.query.filter.FilterOperator
 
 class ChatRepository {
     

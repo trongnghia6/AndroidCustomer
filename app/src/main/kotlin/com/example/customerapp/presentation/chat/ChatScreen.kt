@@ -1,4 +1,4 @@
-package com.example.testappcc.presentation.chat
+package com.example.customerapp.presentation.chat
 
 import android.content.Context
 import android.util.Log
@@ -30,8 +30,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
-import com.example.testappcc.core.supabase
-import com.example.testappcc.data.model.Message
+import com.example.customerapp.core.supabase
+import com.example.customerapp.data.model.Message
 import io.github.jan.supabase.postgrest.from
 import io.github.jan.supabase.postgrest.query.Order
 import io.github.jan.supabase.postgrest.query.filter.FilterOperator
@@ -52,7 +52,7 @@ import kotlinx.coroutines.runBlocking
 import java.time.OffsetDateTime
 import java.time.format.DateTimeFormatter
 import java.util.Objects.isNull
-import com.example.testappcc.data.model.User
+import com.example.customerapp.data.model.User
 
 
 @Composable

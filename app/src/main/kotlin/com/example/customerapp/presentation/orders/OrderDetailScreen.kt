@@ -1,4 +1,4 @@
-package com.example.testappcc.presentation.orders
+package com.example.customerapp.presentation.orders
 
 import android.util.Log
 import androidx.compose.foundation.Image
@@ -18,14 +18,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.rememberAsyncImagePainter
-import com.example.testappcc.data.model.Booking
-import com.example.testappcc.data.model.ProviderService
-import com.example.testappcc.data.model.User
-import com.example.testappcc.data.repository.ProviderServiceRepository
-import com.example.testappcc.presentation.components.SwipeRefreshLayout
+import com.example.customerapp.data.model.Booking
+import com.example.customerapp.data.model.ProviderService
+import com.example.customerapp.data.model.User
+import com.example.customerapp.data.repository.ProviderServiceRepository
+import com.example.customerapp.presentation.components.SwipeRefreshLayout
 import io.github.jan.supabase.postgrest.from
 import kotlinx.coroutines.launch
-import com.example.testappcc.core.supabase
+import com.example.customerapp.core.supabase
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.ShoppingCart
@@ -36,7 +36,7 @@ import java.time.format.DateTimeFormatter
 @Composable
 fun OrderDetailScreen(
     orderId: Int,
-    viewModel: com.example.testappcc.presentation.viewmodel.OrderViewModel
+    viewModel: com.example.customerapp.presentation.viewmodel.OrderViewModel
 ) {
     var booking by remember { mutableStateOf<Booking?>(null) }
     var providerService by remember { mutableStateOf<ProviderService?>(null) }
