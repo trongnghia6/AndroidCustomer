@@ -43,6 +43,12 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import java.util.Locale
+import android.app.Activity
+import android.content.Intent
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import android.content.pm.PackageManager
+import android.widget.Toast
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -66,6 +72,35 @@ fun OrderConfirmScreen(
     var isPlacingOrder by remember { mutableStateOf(false) }
     var orderSuccess by remember { mutableStateOf(false) }
     var orderError by remember { mutableStateOf<String?>(null) }
+
+    val activity = LocalContext.current as? Activity
+
+    // State để lưu kết quả MoMo
+    var momoPaymentSuccess by remember { mutableStateOf(false) }
+    var momoPaymentError by remember { mutableStateOf<String?>(null) }
+
+    // Thêm state để báo lỗi khi không có app MoMo
+    var momoAppNotInstalled by remember { mutableStateOf(false) }
+
+    // Launcher để nhận kết quả từ MoMo
+    val momoLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK && result.data != null) {
+            val data = result.data!!
+            val status = data.getIntExtra("status", -1)
+            if (status == 0) {
+                momoPaymentSuccess = true
+                momoPaymentError = null
+            } else {
+                momoPaymentSuccess = false
+                momoPaymentError = data.getStringExtra("message") ?: "Thanh toán thất bại"
+            }
+        } else {
+            momoPaymentSuccess = false
+            momoPaymentError = "Thanh toán bị huỷ hoặc thất bại"
+        }
+    }
 
     // Thời gian và ngày hiện tại (múi giờ +07:00)
     val now = remember { LocalDateTime.now(ZoneId.of("Asia/Ho_Chi_Minh")) }
@@ -412,58 +447,91 @@ fun OrderConfirmScreen(
         item {
             Button(
                 onClick = {
-                    if (userId != null && providerServiceId != 0) {
-                        isPlacingOrder = true
-                        CoroutineScope(Dispatchers.IO).launch {
-                            try {
-                                val startAtDateTime = startDateTime?.atOffset(ZoneOffset.ofHours(7))
-                                    ?: OffsetDateTime.now(ZoneOffset.ofHours(7))
+                    if (selectedPayment == "MoMo") {
+                        // Kiểm tra app MoMo đã cài chưa
+                        val momoPackage = "com.mservice.momotransfer"
+                        val pm = context.packageManager
+                        val momoInstalled = try {
+                            pm.getPackageInfo(momoPackage, PackageManager.GET_ACTIVITIES)
+                            true
+                        } catch (e: Exception) {
+                            false
+                        }
+                        if (!momoInstalled) {
+                            momoAppNotInstalled = true
+                            return@Button
+                        }
+                        // Gọi SDK MoMo
+                        val momoIntent = Intent("com.momo.payment")
+                        momoIntent.putExtra("merchantName", "Tên Merchant")
+                        momoIntent.putExtra("merchantCode", "Mã Merchant")
+                        momoIntent.putExtra("amount", total.toLong())
+                        momoIntent.putExtra("orderId", System.currentTimeMillis().toString())
+                        momoIntent.putExtra("orderLabel", "Thanh toán dịch vụ")
+                        momoIntent.putExtra("description", "Thanh toán qua MoMo")
+                        momoIntent.putExtra("fee", 0)
+                        momoIntent.putExtra("extra", "")
+                        momoIntent.putExtra("requestId", System.currentTimeMillis().toString())
+                        momoIntent.putExtra("partnerCode", "Mã Partner")
+                        momoIntent.putExtra("partnerName", "Tên Partner")
+                        momoIntent.putExtra("appScheme", "momo")
+                        // ...các tham số khác nếu cần...
 
-                                val endAtDateTime = endDateTime?.atOffset(ZoneOffset.ofHours(7))
-                                    ?: startAtDateTime.plusMinutes(durationMinutes?.toLong() ?: 60L)
+                        momoLauncher.launch(momoIntent)
+                    } else {
+                        // Thanh toán tiền mặt: tạo booking luôn
+                        if (userId != null && providerServiceId != 0) {
+                            isPlacingOrder = true
+                            CoroutineScope(Dispatchers.IO).launch {
+                                try {
+                                    val startAtDateTime = startDateTime?.atOffset(ZoneOffset.ofHours(7))
+                                        ?: OffsetDateTime.now(ZoneOffset.ofHours(7))
 
-                                val formatter = DateTimeFormatter.ISO_OFFSET_DATE_TIME
-                                val startAt = startAtDateTime.format(formatter)
-                                val endAt = endAtDateTime.format(formatter)
-                                val numWorkers = selectedWorkers.toIntOrNull() ?: 1
+                                    val endAtDateTime = endDateTime?.atOffset(ZoneOffset.ofHours(7))
+                                        ?: startAtDateTime.plusMinutes(durationMinutes?.toLong() ?: 60L)
 
-                                val booking = BookingInsert(
-                                    customerId = userId,
-                                    providerServiceId = providerServiceId,
-                                    status = "pending",
-                                    location = address,
-                                    startAt = startAt,
-                                    endAt = endAt,
-                                    numWorkers = numWorkers
-                                )
+                                    val formatter = DateTimeFormatter.ISO_OFFSET_DATE_TIME
+                                    val startAt = startAtDateTime.format(formatter)
+                                    val endAt = endAtDateTime.format(formatter)
+                                    val numWorkers = selectedWorkers.toIntOrNull() ?: 1
 
-                                val bookingResult = supabase.from("bookings")
-                                    .insert(booking) {
-                                        select() // Trả về toàn bộ bản ghi sau khi insert
+                                    val booking = BookingInsert(
+                                        customerId = userId,
+                                        providerServiceId = providerServiceId,
+                                        status = "pending",
+                                        location = address,
+                                        startAt = startAt,
+                                        endAt = endAt,
+                                        numWorkers = numWorkers
+                                    )
+
+                                    val bookingResult = supabase.from("bookings")
+                                        .insert(booking) {
+                                            select() // Trả về toàn bộ bản ghi sau khi insert
+                                        }
+
+                                    // Lấy ID từ kết quả
+                                    val insertedBooking = bookingResult.decodeSingle<BookingResponse>()
+                                    val bookingId = insertedBooking.id
+                                    val transaction = Transaction(
+                                        bookingId = bookingId,
+                                        amount = total,
+                                        status = "pending",
+                                        paymentMethod = selectedPayment
+                                    )
+
+                                    supabase.from("transactions").insert(transaction)
+
+                                    withContext(Dispatchers.Main) {
+                                        isPlacingOrder = false
+                                        orderSuccess = true
                                     }
-
-// Lấy ID từ kết quả
-                                val insertedBooking = bookingResult.decodeSingle<BookingResponse>()
-                                val bookingId = insertedBooking.id
-                                val transaction = Transaction(
-                                    bookingId = bookingId,
-                                    amount = total,
-                                    status = "pending",
-                                    paymentMethod = selectedPayment
-                                )
-
-                                supabase.from("transactions").insert(transaction)
-
-
-                                withContext(Dispatchers.Main) {
-                                    isPlacingOrder = false
-                                    orderSuccess = true
-                                }
-                            } catch (e: Exception) {
-                                withContext(Dispatchers.Main) {
-                                    isPlacingOrder = false
-                                    orderError = e.message
-                                    Log.e("BookingError", "Lỗi đặt đơn: ${e.message}", e)
+                                } catch (e: Exception) {
+                                    withContext(Dispatchers.Main) {
+                                        isPlacingOrder = false
+                                        orderError = e.message
+                                        Log.e("BookingError", "Lỗi đặt đơn: ${e.message}", e)
+                                    }
                                 }
                             }
                         }
@@ -511,6 +579,30 @@ fun OrderConfirmScreen(
         }
 
         item {
+            // Hiển thị kết quả MoMo
+            momoPaymentError?.let {
+                Text(
+                    text = "Lỗi MoMo: $it",
+                    color = Color.Red,
+                    modifier = Modifier.fillMaxWidth(),
+                    textAlign = TextAlign.Center
+                )
+            }
+        }
+
+        item {
+            // Hiển thị lỗi nếu không có app MoMo
+            if (momoAppNotInstalled) {
+                Text(
+                    text = "Bạn chưa cài đặt ứng dụng MoMo. Vui lòng cài đặt MoMo để sử dụng chức năng này.",
+                    color = Color.Red,
+                    modifier = Modifier.fillMaxWidth(),
+                    textAlign = TextAlign.Center
+                )
+            }
+        }
+
+        item {
             OutlinedButton(
                 onClick = onBackClick,
                 modifier = Modifier.fillMaxWidth().height(48.dp),
@@ -523,6 +615,67 @@ fun OrderConfirmScreen(
                     fontWeight = FontWeight.SemiBold,
                     fontSize = MaterialTheme.typography.titleMedium.fontSize
                 )
+            }
+        }
+    }
+
+    // Khi thanh toán MoMo thành công thì tạo booking
+    LaunchedEffect(momoPaymentSuccess) {
+        if (momoPaymentSuccess && userId != null && providerServiceId != 0) {
+            isPlacingOrder = true
+            CoroutineScope(Dispatchers.IO).launch {
+                try {
+                    val startAtDateTime = startDateTime?.atOffset(ZoneOffset.ofHours(7))
+                        ?: OffsetDateTime.now(ZoneOffset.ofHours(7))
+
+                    val endAtDateTime = endDateTime?.atOffset(ZoneOffset.ofHours(7))
+                        ?: startAtDateTime.plusMinutes(durationMinutes?.toLong() ?: 60L)
+
+                    val formatter = DateTimeFormatter.ISO_OFFSET_DATE_TIME
+                    val startAt = startAtDateTime.format(formatter)
+                    val endAt = endAtDateTime.format(formatter)
+                    val numWorkers = selectedWorkers.toIntOrNull() ?: 1
+
+                    val booking = BookingInsert(
+                        customerId = userId,
+                        providerServiceId = providerServiceId,
+                        status = "pending",
+                        location = address,
+                        startAt = startAt,
+                        endAt = endAt,
+                        numWorkers = numWorkers
+                    )
+
+                    val bookingResult = supabase.from("bookings")
+                        .insert(booking) {
+                            select() // Trả về toàn bộ bản ghi sau khi insert
+                        }
+
+                    // Lấy ID từ kết quả
+                    val insertedBooking = bookingResult.decodeSingle<BookingResponse>()
+                    val bookingId = insertedBooking.id
+                    val transaction = Transaction(
+                        bookingId = bookingId,
+                        amount = total,
+                        status = "pending",
+                        paymentMethod = selectedPayment
+                    )
+
+                    supabase.from("transactions").insert(transaction)
+
+                    withContext(Dispatchers.Main) {
+                        isPlacingOrder = false
+                        orderSuccess = true
+                        momoPaymentSuccess = false // reset
+                    }
+                } catch (e: Exception) {
+                    withContext(Dispatchers.Main) {
+                        isPlacingOrder = false
+                        orderError = e.message
+                        momoPaymentSuccess = false // reset
+                        Log.e("BookingError", "Lỗi đặt đơn: ${e.message}", e)
+                    }
+                }
             }
         }
     }
@@ -739,8 +892,8 @@ fun EnhancedDateTimePickerDialog(
                             val millis = dateState.selectedDateMillis
                             if (millis != null) {
                                 val selectedDate = Instant.ofEpochMilli(millis)
-                                    .atZone(ZoneId.of("Asia/Ho_Chi_Minh"))
-                                    .toLocalDate()
+                                    .atZone(ZoneId.of("Asia/Ho_Chi_Minh")
+                                    ).toLocalDate()
                                 val selectedTime = LocalTime.of(timeState.hour, timeState.minute)
                                 val selectedDateTime = LocalDateTime.of(selectedDate, selectedTime)
 
@@ -809,3 +962,6 @@ suspend fun findAvailableWorkers(
         }
     }
 }
+
+// Hiện tại, khi chọn "MoMo", chỉ lưu thông tin vào transaction chứ chưa tích hợp SDK MoMo.
+// Nếu muốn thanh toán MoMo thực tế, cần tích hợp SDK MoMo và xử lý callback thanh toán thành công.
