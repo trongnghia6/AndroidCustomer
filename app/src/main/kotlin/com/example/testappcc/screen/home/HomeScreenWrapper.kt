@@ -36,8 +36,11 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.navigation.NavType
 import androidx.navigation.navArgument
+import com.example.testappcc.core.network.RetrofitClient
 import com.example.testappcc.presentation.orders.OrderDetailScreen
+import com.example.testappcc.presentation.service.ProviderDetailScreen
 import com.example.testappcc.presentation.service.ServiceDetailScreen
+import com.example.testappcc.presentation.userprofile.UserProfileScreen
 import com.example.testappcc.presentation.viewmodel.OrderViewModel
 import io.github.jan.supabase.postgrest.from
 
@@ -93,7 +96,7 @@ fun HomeScreenWrapper(onLogout: () -> Unit) {
                 }
 
                 composable("profile_main") {
-                    ProfileScreen()
+                    UserProfileScreen(geocodingService = RetrofitClient.mapboxGeocodingService,onLogout = onLogout)
                 }
 
                 composable("orders_main") {
@@ -113,10 +116,28 @@ fun HomeScreenWrapper(onLogout: () -> Unit) {
                     OrderDetailScreen(orderId, orderViewModel)
                 }
 
-
-                composable("chat_main") {
-                    ChatScreen()
+                composable("provider_detail/{providerServiceId}") { backStackEntry ->
+                    ProviderDetailScreen(
+                        providerServiceId = backStackEntry.arguments?.getString("providerServiceId") ?: "",
+                        navController = navController,
+                        defaultAvatar = "https://ui-avatars.com/api/?name=User&background=random"
+                    )
                 }
+
+                composable(
+                    route = "chat/{providerServiceId}",
+                    arguments = listOf(navArgument("providerServiceId") { type = NavType.StringType })
+                ) { backStackEntry ->
+                    ChatScreen(
+                        providerServiceId = backStackEntry.arguments?.getString("providerServiceId") ?: "",
+                        navController = navController
+                    )
+                }
+
+
+//                composable("chat_main") {
+//                    ChatScreen()
+//                }
 
                 composable(
                     "service_detail/{name}/{description}/{duration}/{serviceId}"
@@ -175,11 +196,6 @@ fun HomeScreenWrapper(onLogout: () -> Unit) {
             }
         }
     )
-}
-
-@Composable
-fun ProfileScreen() {
-    Text(text = "Trang tài khoản đang được phát triển")
 }
 
 

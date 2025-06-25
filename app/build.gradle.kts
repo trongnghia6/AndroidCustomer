@@ -106,6 +106,8 @@ dependencies {
     implementation(libs.ktor.serialization.json)
     implementation(libs.ktor.client.logging)
     implementation(libs.ktor.client.auth)
+    implementation(libs.ktor.client.cio)
+    implementation(libs.ktor.client.websockets)
 
     // Logging
     implementation(libs.slf4j.simple)
@@ -127,6 +129,7 @@ dependencies {
     implementation(libs.calendarcompose)
     implementation(libs.coil.compose)
     implementation(libs.compose.foundation)
+    implementation(libs.material.icons.extended)
 
-    implementation("com.google.accompanist:accompanist-swiperefresh:0.30.1")
+
 }

@@ -15,7 +15,6 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.material3.TimePicker
 import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.material3.DatePicker
-import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.ui.platform.LocalContext
 import android.content.Context
@@ -33,6 +32,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import com.example.testappcc.data.model.BookingInsert
+import com.example.testappcc.data.model.BookingResponse
+import com.example.testappcc.data.model.Transaction
 import io.github.jan.supabase.postgrest.postgrest
 import java.time.*
 import java.time.format.DateTimeFormatter
@@ -41,6 +42,7 @@ import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -56,7 +58,6 @@ fun OrderConfirmScreen(
 ) {
     val context = LocalContext.current
     val serviceFee = 6000.0
-    val total = price + serviceFee
     var selectedPayment by remember { mutableStateOf("MoMo") }
     val userId = remember {
         context.getSharedPreferences("user_session", Context.MODE_PRIVATE)
@@ -78,18 +79,26 @@ fun OrderConfirmScreen(
     var workerSelectionError by remember { mutableStateOf<String?>(null) }
     val timeFormatter = DateTimeFormatter.ofPattern("HH:mm")
     val dateFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy")
+    val durationHours = if (startDateTime != null && endDateTime != null) {
+        val duration = Duration.between(startDateTime, endDateTime)
+        duration.toMinutes().toDouble() / 60.0
+    } else 0.0
+    val numWorkers = selectedWorkers.toIntOrNull() ?: 1
+    val calculatedPrice = price * durationHours * numWorkers
+    val total = calculatedPrice + serviceFee
+
 
     // Kiểm tra số lượng người được chọn
     LaunchedEffect(selectedWorkers, availableWorkers) {
         try {
             val numWorkers = selectedWorkers.toIntOrNull()
-            if (numWorkers == null || numWorkers < 1) {
-                workerSelectionError = "Vui lòng nhập số lượng nhân viên hợp lệ (tối thiểu 1)"
-            } else if (availableWorkers != null && numWorkers > availableWorkers!!) {
-                workerSelectionError =
+            val workers = availableWorkers ?: 0
+            workerSelectionError = when {
+                numWorkers == null || numWorkers < 1 ->
+                    "Vui lòng nhập số lượng nhân viên hợp lệ (tối thiểu 1)"
+                availableWorkers != null && numWorkers > workers ->
                     "Số nhân viên chọn ($numWorkers) vượt quá số nhân viên rảnh ($availableWorkers)"
-            } else {
-                workerSelectionError = null
+                else -> null
             }
         } catch (e: Exception) {
             workerSelectionError = "Lỗi nhập số lượng: ${e.message}"
@@ -338,7 +347,7 @@ fun OrderConfirmScreen(
                     Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween) {
                         Text(text = "Phí đơn hàng")
                         Text(
-                            text = String.format("%,.0f₫", price),
+                            text = String.format(Locale("vi", "VN"),"%,.0f₫", calculatedPrice),
                             fontWeight = FontWeight.Medium
                         )
                     }
@@ -349,14 +358,14 @@ fun OrderConfirmScreen(
                             fontWeight = FontWeight.Medium
                         )
                     }
-                    Divider(Modifier.padding(vertical = 8.dp))
+                    HorizontalDivider(Modifier.padding(vertical = 8.dp))
                     Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween) {
                         Text(
                             text = "Tổng thanh toán",
                             fontWeight = FontWeight.Bold
                         )
                         Text(
-                            text = String.format("%,.0f₫", total),
+                            text = String.format(Locale("vi", "VN"),"%,.0f₫", total),
                             fontWeight = FontWeight.Bold,
                             color = Color(0xFFE53935)
                         )
@@ -428,7 +437,23 @@ fun OrderConfirmScreen(
                                     numWorkers = numWorkers
                                 )
 
-                                supabase.from("bookings").insert(booking)
+                                val bookingResult = supabase.from("bookings")
+                                    .insert(booking) {
+                                        select() // Trả về toàn bộ bản ghi sau khi insert
+                                    }
+
+// Lấy ID từ kết quả
+                                val insertedBooking = bookingResult.decodeSingle<BookingResponse>()
+                                val bookingId = insertedBooking.id
+                                val transaction = Transaction(
+                                    bookingId = bookingId,
+                                    amount = total,
+                                    status = "pending",
+                                    paymentMethod = selectedPayment
+                                )
+
+                                supabase.from("transactions").insert(transaction)
+
 
                                 withContext(Dispatchers.Main) {
                                     isPlacingOrder = false
@@ -454,7 +479,7 @@ fun OrderConfirmScreen(
             ) {
                 Text(
                     text = if (isPlacingOrder) "Đang đặt đơn..." else "Đặt đơn - ${
-                        String.format(
+                        String.format(Locale("vi", "VN"),
                             "%,.0f₫",
                             total
                         )
@@ -490,7 +515,7 @@ fun OrderConfirmScreen(
                 onClick = onBackClick,
                 modifier = Modifier.fillMaxWidth().height(48.dp),
                 shape = RoundedCornerShape(12.dp),
-                border = ButtonDefaults.outlinedButtonBorder.copy(width = 2.dp)
+                border = ButtonDefaults.outlinedButtonBorder(enabled = true)
             ) {
                 Text(
                     text = "Quay lại",
@@ -531,6 +556,7 @@ fun OrderConfirmScreen(
     }
 }
 
+
 // Enhanced DateTimePicker với giao diện đẹp hơn
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -540,7 +566,7 @@ fun EnhancedDateTimePickerDialog(
     onConfirm: (LocalDateTime) -> Unit
 ) {
     val now = LocalDateTime.now(ZoneId.of("Asia/Ho_Chi_Minh"))
-    var selectedTab by remember { mutableStateOf(0) }
+    var selectedTab by remember { mutableIntStateOf(0) }
 
     val dateState = rememberDatePickerState(
         initialSelectedDateMillis = initialDateTime.toLocalDate()
