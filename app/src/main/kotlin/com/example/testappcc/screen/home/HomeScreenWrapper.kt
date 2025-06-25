@@ -16,6 +16,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
@@ -26,6 +27,7 @@ import com.example.testappcc.presentation.BottomNavItem
 import com.example.testappcc.presentation.viewmodel.HomeViewModel
 import com.example.testappcc.presentation.orders.OrdersScreen
 import com.example.testappcc.presentation.chat.ChatScreen
+import com.example.testappcc.presentation.chat.ChatListScreen
 import com.example.testappcc.presentation.checkout.OrderConfirmScreen
 import com.example.testappcc.data.model.User
 import com.example.testappcc.core.supabase
@@ -36,31 +38,38 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.navigation.NavType
 import androidx.navigation.navArgument
+import com.example.testappcc.core.network.RetrofitClient
 import com.example.testappcc.presentation.orders.OrderDetailScreen
+import com.example.testappcc.presentation.service.ProviderDetailScreen
 import com.example.testappcc.presentation.service.ServiceDetailScreen
+import com.example.testappcc.presentation.userprofile.UserProfileScreen
 import com.example.testappcc.presentation.viewmodel.OrderViewModel
 import io.github.jan.supabase.postgrest.from
 
 @Composable
-fun HomeScreenWrapper(onLogout: () -> Unit) {
-    val navController = rememberNavController()
+fun HomeScreenWrapper(
+    onLogout: () -> Unit, 
+    navController: NavController? = null
+) {
+    val internalNavController = rememberNavController()
+    val actualNavController = navController ?: internalNavController
 
     val bottomNavItems = listOf(
         BottomNavItem("Trang chủ", "home_main", Icons.Default.Home),
         BottomNavItem("Đơn hàng", "orders_main", Icons.Default.DateRange),
-        BottomNavItem("Trò chuyện", "chat_main", icon = Icons.Default.Email),
+        BottomNavItem("Trò chuyện", "chat_main",  Icons.Default.Email),
         BottomNavItem("Tài khoản", "profile_main", Icons.Default.Person),
     )
 
     Scaffold(
         bottomBar = {
             NavigationBar {
-                val currentRoute = navController.currentBackStackEntryAsState().value?.destination?.route
+                val currentRoute = internalNavController.currentBackStackEntryAsState().value?.destination?.route
                 bottomNavItems.forEach { item ->
                     NavigationBarItem(
                         selected = currentRoute == item.route,
                         onClick = {
-                            navController.navigate(item.route) {
+                            internalNavController.navigate(item.route) {
                                 popUpTo("home_main") { inclusive = false }
                                 launchSingleTop = true
                                 restoreState = true
@@ -74,7 +83,7 @@ fun HomeScreenWrapper(onLogout: () -> Unit) {
         },
         content = { innerPadding ->
             NavHost(
-                navController = navController,
+                navController = internalNavController,
                 startDestination = "home_main",
                 modifier = Modifier.padding(innerPadding)
             ) {
@@ -87,19 +96,23 @@ fun HomeScreenWrapper(onLogout: () -> Unit) {
                         HomeScreen(
                             onLogout = onLogout,
                             viewModel = homeViewModel,
-                            navController = navController
+                            navController = internalNavController
                         )
                     }
                 }
 
                 composable("profile_main") {
-                    ProfileScreen()
+                    UserProfileScreen(
+                        geocodingService = RetrofitClient.mapboxGeocodingService,
+                        onLogout = onLogout,
+                        navController = if (navController != null) navController else internalNavController
+                    )
                 }
 
                 composable("orders_main") {
                     OrdersScreen(
                         onOrderClick = { orderId ->
-                            navController.navigate("order_detail/$orderId")
+                            internalNavController.navigate("order_detail/$orderId")
                         }
                     )
                 }
@@ -108,14 +121,31 @@ fun HomeScreenWrapper(onLogout: () -> Unit) {
                     arguments = listOf(navArgument("orderId") { type = NavType.IntType })
                 ) { backStackEntry ->
                     val orderId = backStackEntry.arguments?.getInt("orderId") ?: 0
-                    Log.d("RenderOrder", "OderId ${orderId}")
+                    Log.d("RenderOrder", "OderId $orderId")
                     val orderViewModel: OrderViewModel = viewModel()
                     OrderDetailScreen(orderId, orderViewModel)
                 }
 
+                composable("provider_detail/{providerServiceId}") { backStackEntry ->
+                    ProviderDetailScreen(
+                        providerServiceId = backStackEntry.arguments?.getString("providerServiceId") ?: "",
+                        navController = internalNavController,
+                        defaultAvatar = "https://ui-avatars.com/api/?name=User&background=random"
+                    )
+                }
+
+                composable(
+                    route = "chat/{providerId}",
+                    arguments = listOf(navArgument("providerId") { type = NavType.StringType })
+                ) { backStackEntry ->
+                    ChatScreen(
+                        providerId = backStackEntry.arguments?.getString("providerId") ?: "",
+                        navController = internalNavController
+                    )
+                }
 
                 composable("chat_main") {
-                    ChatScreen()
+                    ChatListScreen(navController = internalNavController)
                 }
 
                 composable(
@@ -131,7 +161,7 @@ fun HomeScreenWrapper(onLogout: () -> Unit) {
                         serviceName = name,
                         serviceDescription = description,
                         durationMinutes = duration,
-                        navController = navController
+                        navController = internalNavController
                     )
                 }
 
@@ -166,20 +196,15 @@ fun HomeScreenWrapper(onLogout: () -> Unit) {
                             durationMinutes = durationMinutes,
                             providerServiceId = providerServiceId,
                             onOrderClick = { orderId ->
-                                navController.navigate("order_detail/$orderId")
+                                internalNavController.navigate("order_detail/$orderId")
                             },
-                            onBackClick = { navController.popBackStack() }
+                            onBackClick = { internalNavController.popBackStack() }
                         )
                     }
                 }
             }
         }
     )
-}
-
-@Composable
-fun ProfileScreen() {
-    Text(text = "Trang tài khoản đang được phát triển")
 }
 
 

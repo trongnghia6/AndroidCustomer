@@ -12,10 +12,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -168,7 +166,7 @@ fun OrderDetailScreen(
                         Text("Trạng thái:", fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
                         Text(statusSteps[statusIndex], color = Color(0xFF4CAF50), fontWeight = FontWeight.Bold)
                     }
-                    Divider(Modifier.padding(vertical = 8.dp))
+                    HorizontalDivider(Modifier.padding(vertical = 8.dp))
                     Row {
                         Text("Thời gian tạo:", modifier = Modifier.weight(1f))
                         val createdAtString = booking!!.created_at

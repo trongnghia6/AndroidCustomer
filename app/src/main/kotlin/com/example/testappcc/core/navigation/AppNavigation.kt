@@ -9,9 +9,10 @@ import com.example.testappcc.core.network.MapboxGeocodingService
 import com.example.testappcc.core.network.RetrofitClient
 import com.example.testappcc.model.viewmodel.AuthViewModel
 import com.example.testappcc.core.supabase
-import com.example.testappcc.screen.LoginScreen
+import com.example.testappcc.presentation.auth.LoginScreen
+import com.example.testappcc.presentation.auth.RegisterScreen
+import com.example.testappcc.presentation.avatar.AvatarScreen
 import com.example.testappcc.presentation.search.MapboxSuggestionScreen
-import com.example.testappcc.screen.RegisterScreen
 import com.example.testappcc.screen.home.HomeScreenWrapper
 import io.github.jan.supabase.auth.auth
 import kotlinx.coroutines.CoroutineScope
@@ -85,8 +86,13 @@ fun AppNavigation() {
                     navController.navigate("login") {
                         popUpTo("home") { inclusive = true }
                     }
-                }
+                },
+                navController = navController
             )
+        }
+        
+        composable("avatar") {
+            AvatarScreen(navController = navController)
         }
     }
 }
