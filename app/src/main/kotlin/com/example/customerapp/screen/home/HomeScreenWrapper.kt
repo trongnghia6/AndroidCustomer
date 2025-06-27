@@ -38,12 +38,12 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.navigation.NavType
 import androidx.navigation.navArgument
-import com.example.customerapp.core.network.RetrofitClient
 import com.example.customerapp.presentation.orders.OrderDetailScreen
 import com.example.customerapp.presentation.service.ProviderDetailScreen
 import com.example.customerapp.presentation.service.ServiceDetailScreen
-import com.example.customerapp.presentation.userprofile.UserProfileScreen
+import com.example.customerapp.presentation.userprofile.AvatarChangeScreen
 import com.example.customerapp.presentation.viewmodel.OrderViewModel
+import com.example.providerapp.presentation.userprofile.UserProfileView
 import io.github.jan.supabase.postgrest.from
 
 @Composable
@@ -102,10 +102,10 @@ fun HomeScreenWrapper(
                 }
 
                 composable("profile_main") {
-                    UserProfileScreen(
-                        geocodingService = RetrofitClient.mapboxGeocodingService,
-                        onLogout = onLogout,
-                        navController = if (navController != null) navController else internalNavController
+                    UserProfileView(
+                        onAvatarClick = {
+                            internalNavController.navigate("avatar_change")
+                        }
                     )
                 }
 
@@ -201,6 +201,11 @@ fun HomeScreenWrapper(
                             onBackClick = { internalNavController.popBackStack() }
                         )
                     }
+                }
+                composable("avatar_change") {
+                    AvatarChangeScreen(
+                        onBackClick = { internalNavController.popBackStack() }
+                    )
                 }
             }
         }

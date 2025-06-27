@@ -1,4 +1,4 @@
-package com.example.customerapp.presentation.userprofile
+package com.example.providerapp.presentation.userprofile
 
 import android.content.Context
 import androidx.compose.foundation.layout.Arrangement
@@ -43,23 +43,29 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.navigation.NavController
 import com.example.customerapp.BuildConfig
 import com.example.customerapp.core.network.MapboxPlace
 import kotlinx.coroutines.launch
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
 import androidx.core.content.ContextCompat
+import coil.compose.AsyncImage
 import com.example.customerapp.core.network.MapboxGeocodingService
 import com.example.customerapp.presentation.auth.getCurrentLocationAndUpdateAddress
+import com.example.customerapp.presentation.userprofile.UserViewModel
 
 
 @Composable
@@ -67,7 +73,7 @@ fun UserProfileScreen(
     viewModel: UserViewModel = viewModel(),
     geocodingService: MapboxGeocodingService,
     onLogout: () -> Unit,
-    navController: NavController
+    onAvatarClick: () -> Unit = {}
 ) {
     val user = viewModel.user
     val isEditing = viewModel.isEditing
@@ -193,7 +199,29 @@ fun UserProfileScreen(
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                 elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
             ) {
-                Column(modifier = Modifier.padding(20.dp)) {
+                Column(modifier = Modifier.padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+
+                    // Avatar
+                    Box(
+                        modifier = Modifier
+                            .size(100.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f))
+                            .clickable { onAvatarClick() }, // sử dụng callback khi nhấn avatar
+                        contentAlignment = Alignment.Center
+                    ) {
+                        AsyncImage(
+                            model = user.avatar ?: "", // đường dẫn avatar
+                            contentDescription = "Avatar",
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier
+                                .size(90.dp)
+                                .clip(CircleShape)
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(16.dp))
+
+
                     // Email - luôn đọc
                     Text(
                         text = "Email",
@@ -220,7 +248,7 @@ fun UserProfileScreen(
 
                     if (isEditing) {
                         OutlinedTextField(
-                            value = name ?: "",
+                            value = name ?: "Người dùng",
                             onValueChange = { name = it },
                             label = { Text("Tên") },
                             modifier = Modifier.fillMaxWidth(),
@@ -233,7 +261,7 @@ fun UserProfileScreen(
                         Spacer(modifier = Modifier.height(12.dp))
 
                         OutlinedTextField(
-                            value = address ?: "",
+                            value = address ?: "Chưa có địa chỉ",
                             onValueChange = {
                                 address = it
                                 coroutineScope.launch {
@@ -293,11 +321,11 @@ fun UserProfileScreen(
                         ) {
                             items(suggestions) { place ->
                                 Text(
-                                    text = place.placeName ?: "Unknown",
+                                    text = place.placeName,
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .clickable {
-                                            address = place.placeName ?: ""
+                                            address = place.placeName
                                             suggestions = emptyList()
                                         }
                                         .padding(8.dp)
@@ -307,7 +335,7 @@ fun UserProfileScreen(
                         Spacer(modifier = Modifier.height(12.dp))
 
                         OutlinedTextField(
-                            value = phoneNumber ?: "",
+                            value = phoneNumber ?: "Chưa có số điện thoại",
                             onValueChange = { phoneNumber = it },
                             label = { Text("Số điện thoại") },
                             modifier = Modifier.fillMaxWidth(),
@@ -364,9 +392,9 @@ fun UserProfileScreen(
                             }
                         }
                     } else {
-                        InfoRow(label = "Tên", value = user.name ?: "Chưa cập nhật")
-                        InfoRow(label = "Địa chỉ", value = user.address ?: "Chưa cập nhật")
-                        InfoRow(label = "Số điện thoại", value = user.phone_number ?: "Chưa cập nhật")
+                        InfoRow(label = "Tên", value = user.name ?: "Người dùng")
+                        InfoRow(label = "Địa chỉ", value = user.address ?: "Chưa có địa chỉ")
+                        InfoRow(label = "Số điện thoại", value = user.phone_number ?: "Chưa có số điện thoại")
 
                         Spacer(modifier = Modifier.height(20.dp))
 
@@ -377,15 +405,6 @@ fun UserProfileScreen(
                             Text("Chỉnh sửa")
                         }
 
-                        Spacer(modifier = Modifier.height(12.dp))
-
-                        // Nút thay đổi ảnh đại diện
-                        Button(
-                            onClick = { navController.navigate("avatar") },
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text("Thay đổi ảnh đại diện")
-                        }
 
                         Spacer(modifier = Modifier.height(12.dp))
 
@@ -535,4 +554,16 @@ private fun InfoRow(label: String, value: String) {
             style = MaterialTheme.typography.bodyLarge
         )
     }
+}
+
+// Wrapper function for MainScreen usage
+@Composable
+fun UserProfileView(
+    onAvatarClick: (() -> Unit)? = null
+) {
+    UserProfileScreen(
+        geocodingService = com.example.customerapp.core.network.RetrofitClient.mapboxGeocodingService,
+        onLogout = {}, // Default empty logout for now
+        onAvatarClick = onAvatarClick ?: {}
+    )
 }
