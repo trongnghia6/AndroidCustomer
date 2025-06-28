@@ -13,8 +13,11 @@ data class Booking(
     val created_at: String? = null,
     val start_at: String? = null,
     val end_at: String? = null,
-    val description: String? = null
+    val description: String? = null,
+    @SerialName("number_workers")
+    val number_workers: Int? = null
 )
+
 @Serializable
 data class Transaction(
     val id: Long? = null,
@@ -25,3 +28,4 @@ data class Transaction(
     @SerialName("payment_method")
     val paymentMethod: String? = null,
 )
+

@@ -19,11 +19,12 @@ class ProviderServiceRepository {
 
     suspend fun getProviderServiceById(id: Int): ProviderService? {
         return supabase.from("provider_services")
-            .select(columns = Columns.list("*, user:users(*)")) {
+            .select(columns = Columns.list("*, user:users(*), service:services(*)")) {
                 filter {
                     eq("id", id)
                 }
             }
             .decodeSingleOrNull()
     }
-} 
+}
+

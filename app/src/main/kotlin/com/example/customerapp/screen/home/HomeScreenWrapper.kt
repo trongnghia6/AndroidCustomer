@@ -123,7 +123,11 @@ fun HomeScreenWrapper(
                     val orderId = backStackEntry.arguments?.getInt("orderId") ?: 0
                     Log.d("RenderOrder", "OderId $orderId")
                     val orderViewModel: OrderViewModel = viewModel()
-                    OrderDetailScreen(orderId, orderViewModel)
+                    OrderDetailScreen(
+                        orderId = orderId,
+                        viewModel = orderViewModel,
+                        navController = internalNavController
+                    )
                 }
 
                 composable("provider_detail/{providerServiceId}") { backStackEntry ->
@@ -211,5 +215,4 @@ fun HomeScreenWrapper(
         }
     )
 }
-
 

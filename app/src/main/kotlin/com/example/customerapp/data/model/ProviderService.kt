@@ -20,6 +20,8 @@ data class ProviderService(
     val durationMinutes: Int? = null,
     val name: String? = null,
     @SerialName("user")
-    val user: User? = null
+    val user: User? = null,
+    @SerialName("service")
+    val service: Service? = null
 )
 
