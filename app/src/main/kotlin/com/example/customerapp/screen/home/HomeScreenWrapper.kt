@@ -43,7 +43,7 @@ import com.example.customerapp.presentation.service.ProviderDetailScreen
 import com.example.customerapp.presentation.service.ServiceDetailScreen
 import com.example.customerapp.presentation.userprofile.AvatarChangeScreen
 import com.example.customerapp.presentation.viewmodel.OrderViewModel
-import com.example.providerapp.presentation.userprofile.UserProfileView
+import com.example.customerapp.presentation.userprofile.UserProfileView
 import io.github.jan.supabase.postgrest.from
 
 @Composable

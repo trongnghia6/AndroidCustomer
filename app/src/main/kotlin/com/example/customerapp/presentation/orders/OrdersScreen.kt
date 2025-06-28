@@ -26,13 +26,13 @@ import com.example.customerapp.core.supabase
 import com.example.customerapp.data.model.Booking
 import com.example.customerapp.data.model.Review
 import com.example.customerapp.data.model.ReviewInsert
+import com.example.customerapp.data.model.formatTimestampToUserTimezonePretty
 import com.example.customerapp.data.repository.ProviderServiceRepository
 import io.github.jan.supabase.postgrest.from
+import io.github.jan.supabase.postgrest.query.Order
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import java.time.OffsetDateTime
-import java.time.format.DateTimeFormatter
 
 
 
@@ -55,9 +55,13 @@ fun OrdersScreen(
             isLoading = true
             CoroutineScope(Dispatchers.IO).launch {
                 try {
-                    val bookingResult = supabase.from("bookings").select().decodeList<Booking>()
+                    val bookingResult = supabase.from("bookings").select {
+                        order(column = "created_at", order = Order.DESCENDING)
+                    }.decodeList<Booking>()
                     orders = bookingResult.filter { it.customer_id == userId }
-                    val reviewResult = supabase.from("service_ratings").select().decodeList<Review>()
+                    val reviewResult = supabase.from("service_ratings").select{
+                        order(column = "created_at", order = Order.DESCENDING)
+                    }.decodeList<Review>()
                     reviews = reviewResult.filter { booking -> orders.any { it.id == booking.bookingId } }
                     isLoading = false
                 } catch (e: Exception) {
@@ -124,10 +128,35 @@ fun OrdersScreen(
                 )
             }
             else -> {
+                val refreshOrders = {
+                    if (userId != null) {
+                        CoroutineScope(Dispatchers.IO).launch {
+                            try {
+                                val bookingResult = supabase.from("bookings").select().decodeList<Booking>()
+                                orders = bookingResult.filter { it.customer_id == userId }
+                            } catch (e: Exception) {
+                                error = e.message
+                            }
+                        }
+                    }
+                }
+                
                 when (selectedTab) {
-                    0 -> OrderList(orders.filter { it.status == "pending" || it.status == "confirmed" }, onOrderClick)
-                    1 -> OrderList(orders.filter { it.status == "completed" }, onOrderClick)
-                    2 -> OrderList(orders.filter { it.status == "cancelled" }, onOrderClick)
+                    0 -> OrderList(
+                        orders.filter { it.status == "pending" || it.status == "accepted" }, 
+                        onOrderClick,
+                        onRefresh = refreshOrders
+                    )
+                    1 -> OrderList(
+                        orders.filter { it.status == "completed" || it.status == "c-confirmed" || it.status == "p-confirmed" }, 
+                        onOrderClick,
+                        onRefresh = refreshOrders
+                    )
+                    2 -> OrderList(
+                        orders.filter { it.status == "cancelled" }, 
+                        onOrderClick,
+                        onRefresh = refreshOrders
+                    )
                     3 -> ReviewList(
                         orders.filter { it.status == "completed" },
                         reviews,
@@ -166,8 +195,34 @@ fun OrdersScreen(
 }
 
 @Composable
-fun OrderList(orderList: List<Booking>, onOrderClick: (String) -> Unit) {
+fun OrderList(
+    orderList: List<Booking>, 
+    onOrderClick: (String) -> Unit,
+    onRefresh: (() -> Unit)? = null
+) {
     val providerRepo = remember { ProviderServiceRepository() }
+    var isUpdating by remember { mutableStateOf<Long?>(null) }
+    
+    // Function to update order status
+    suspend fun updateOrderStatus(orderId: Long, newStatus: String) {
+        try {
+            isUpdating = orderId
+            supabase.from("bookings")
+                .update({
+                    set("status" , newStatus)
+                }){
+                    filter {
+                        eq("id", orderId) // Only allow update if current status is accepted
+                    }
+                } // Refresh page after update
+            onRefresh?.invoke()
+        } catch (e: Exception) {
+            // Handle error
+        } finally {
+            isUpdating = null
+        }
+    }
+    
     if (orderList.isEmpty()) {
         Column(
             modifier = Modifier.fillMaxSize(),
@@ -198,33 +253,41 @@ fun OrderList(orderList: List<Booking>, onOrderClick: (String) -> Unit) {
                 }
                 val statusText = when (order.status) {
                     "pending" -> "Chờ xác nhận"
-                    "confirmed" -> "Đã xác nhận"
+                    "accepted" -> "Đã chấp nhận"
+                    "p-confirmed" -> "Nhà cung cấp đã xác nhận"
+                    "c-confirmed" -> "Khách hàng đã xác nhận"
                     "completed" -> "Đã hoàn thành"
                     "cancelled" -> "Đã huỷ"
                     else -> order.status
                 }
                 val statusColor = when (order.status) {
                     "pending" -> Color(0xFFFFA000)
-                    "confirmed" -> Color(0xFF1976D2)
+                    "accepted" -> Color(0xFF4CAF50)
+                    "p-confirmed" -> Color(0xFF0288D1)
+                    "c-confirmed" -> Color(0xFF1976D2)
                     "completed" -> Color(0xFF388E3C)
                     "cancelled" -> Color(0xFFE53935)
                     else -> MaterialTheme.colorScheme.onSurfaceVariant
                 }
-                val createdAt = order.created_at
-                val formattedTime = try {
-                    if (createdAt != null) {
-                        val instant = OffsetDateTime.parse(createdAt)
-                        instant.format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm"))
-                    } else "-"
-                } catch (e: Exception) {
-                    createdAt ?: "-"
+                val createdAt = formatTimestampToUserTimezonePretty(order.created_at)
+
+                val showConfirmButton = order.status == "accepted" || order.status == "p-confirmed"
+                val nextStatus = when (order.status) {
+                    "accepted" -> "c-confirmed"
+                    "p-confirmed" -> "completed"
+                    else -> null
                 }
+                
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(16.dp))
                         .clickable { onOrderClick(order.id.toString()) }
-                        .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.1f), RoundedCornerShape(16.dp)),
+                        .border(
+                            1.dp,
+                            MaterialTheme.colorScheme.outline.copy(alpha = 0.1f),
+                            RoundedCornerShape(16.dp)
+                        ),
                     colors = CardDefaults.cardColors(
                         containerColor = MaterialTheme.colorScheme.surface
                     ),
@@ -259,10 +322,49 @@ fun OrderList(orderList: List<Booking>, onOrderClick: (String) -> Unit) {
                         )
                         Spacer(modifier = Modifier.height(6.dp))
                         Text(
-                            text = "Thời gian tạo: $formattedTime",
+                            text = "Thời gian tạo: $createdAt",
                             fontSize = MaterialTheme.typography.bodySmall.fontSize,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
+                        
+                        // Confirm button for accepted and p-confirmed orders
+                        if (showConfirmButton && nextStatus != null) {
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.End
+                            ) {
+                                Button(
+                                    onClick = {
+                                        CoroutineScope(Dispatchers.IO).launch {
+                                            updateOrderStatus(order.id, nextStatus)
+                                        }
+                                    },
+                                    enabled = isUpdating != order.id,
+                                    modifier = Modifier.height(40.dp),
+                                    shape = RoundedCornerShape(8.dp),
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = MaterialTheme.colorScheme.primary,
+                                        contentColor = MaterialTheme.colorScheme.onPrimary
+                                    )
+                                ) {
+                                    if (isUpdating == order.id) {
+                                        CircularProgressIndicator(
+                                            modifier = Modifier.size(16.dp),
+                                            strokeWidth = 2.dp,
+                                            color = MaterialTheme.colorScheme.onPrimary
+                                        )
+                                    } else {
+                                        Text(
+                                            text = "Xác nhận",
+                                            style = MaterialTheme.typography.bodyMedium.copy(
+                                                fontWeight = FontWeight.Medium
+                                            )
+                                        )
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -312,7 +414,11 @@ fun ReviewList(
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(16.dp))
                         .clickable { onOrderClick(order.id.toString()) }
-                        .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.1f), RoundedCornerShape(16.dp)),
+                        .border(
+                            1.dp,
+                            MaterialTheme.colorScheme.outline.copy(alpha = 0.1f),
+                            RoundedCornerShape(16.dp)
+                        ),
                     colors = CardDefaults.cardColors(
                         containerColor = MaterialTheme.colorScheme.surface
                     ),
