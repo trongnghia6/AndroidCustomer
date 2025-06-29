@@ -37,13 +37,16 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import coil.compose.AsyncImage
 import com.example.customerapp.presentation.components.ServiceTypeItem
+import com.example.customerapp.presentation.components.NotificationIconWithBadge
 import com.example.customerapp.presentation.viewmodel.HomeViewModel
+import com.example.customerapp.presentation.viewmodel.NotificationViewModel
+import androidx.core.content.edit
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -54,6 +57,16 @@ fun HomeScreen(
 ) {
     var expanded by remember { mutableStateOf(false) }
     val context = LocalContext.current
+    val notificationViewModel: NotificationViewModel = viewModel()
+    
+    // Load unread notification count
+    LaunchedEffect(Unit) {
+        val sharedPref = context.getSharedPreferences("user_session", Context.MODE_PRIVATE)
+        val userId = sharedPref.getString("user_id", "") ?: ""
+        if (userId.isNotEmpty()) {
+            notificationViewModel.loadNotifications(userId)
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -71,17 +84,21 @@ fun HomeScreen(
                             text = { Text("Đăng xuất") },
                             onClick = {
                                 expanded = false
-                                val sharedPref = context.getSharedPreferences("user_session", Context.MODE_PRIVATE)
-                                sharedPref.edit().clear().apply()
-                                onLogout()
+                                // Sử dụng AuthViewModel để logout hoàn chỉnh
+                                val authViewModel = com.example.customerapp.model.viewmodel.AuthViewModel()
+                                authViewModel.logout(context) {
+                                    onLogout()
+                                }
                             }
                         )
                     }
                 },
                 actions = {
-                    IconButton(onClick = { /* TODO */ }) {
-                        Icon(Icons.Default.Notifications, contentDescription = "Search")
-                    }
+                    
+                    NotificationIconWithBadge(
+                        unreadCount = notificationViewModel.unreadCount,
+                        onClick = { navController.navigate("notifications") }
+                    )
                 }
             )
         }

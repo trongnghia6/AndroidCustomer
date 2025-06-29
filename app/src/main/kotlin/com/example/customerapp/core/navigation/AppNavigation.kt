@@ -17,21 +17,31 @@ import com.example.customerapp.screen.home.HomeScreenWrapper
 import io.github.jan.supabase.auth.auth
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 
 @Composable
-fun AppNavigation() {
+fun AppNavigation(initialRoute: String? = null) {
     val navController = rememberNavController()
-//    var authError by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(Unit) {
         CoroutineScope(Dispatchers.Main).launch {
             val session = supabase.auth.currentSessionOrNull()
             if (session != null) {
-                navController.navigate("search") {
-                    popUpTo("login") { inclusive = true }
+                // Nếu có initialRoute từ notification, navigate đến đó
+                if (initialRoute == "notifications") {
+                    navController.navigate("home") {
+                        popUpTo("login") { inclusive = true }
+                    }
+                    // Delay một chút rồi navigate đến notifications
+                    kotlinx.coroutines.delay(500)
+                    navController.navigate("notifications")
+                } else {
+                    navController.navigate("search") {
+                        popUpTo("login") { inclusive = true }
+                    }
                 }
             }
         }
@@ -93,6 +103,12 @@ fun AppNavigation() {
         
         composable("avatar") {
             AvatarScreen(navController = navController)
+        }
+        
+        composable("notifications") {
+            com.example.customerapp.presentation.notification.NotificationScreen(
+                navController = navController
+            )
         }
     }
 }

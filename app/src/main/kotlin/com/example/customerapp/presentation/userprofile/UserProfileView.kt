@@ -289,7 +289,7 @@ fun UserProfileScreen(
                 // Action Buttons Card
                 ActionButtonsCard(
                     onChangePasswordClick = { isChangingPassword = true },
-                    onLogoutClick = { viewModel.logout(onLogout) }
+                                                onLogoutClick = { viewModel.logout(context, onLogout) }
                 )
 
                 Spacer(modifier = Modifier.height(100.dp))
@@ -984,11 +984,12 @@ private fun ModernPasswordChangeDialog(
 // Wrapper function for MainScreen usage
 @Composable
 fun UserProfileView(
+    onLogout: () -> Unit = {},
     onAvatarClick: (() -> Unit)? = null
 ) {
     UserProfileScreen(
         geocodingService = mapboxGeocodingService,
-        onLogout = {},
+        onLogout = onLogout,
         onAvatarClick = onAvatarClick ?: {}
     )
 }

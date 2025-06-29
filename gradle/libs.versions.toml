@@ -25,6 +25,7 @@ kizitonwose = "2.7.0"
 coil = "2.4.0"
 compose = "1.8.3"
 composeicons = "1.7.8"
+firebase-bom = "32.7.1"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -90,6 +91,11 @@ mapbox-sdk-services = { group = "com.mapbox.mapboxsdk", name = "mapbox-sdk-servi
 calendarview = { module = "com.kizitonwose.calendar:view", version.ref = "kizitonwose" }
 calendarcompose = { module = "com.kizitonwose.calendar:compose", version.ref = "kizitonwose" }
 #mapbox-android-sdk = { group = "com.mapbox.mapboxsdk", name = "mapbox-android-sdk", version = "9.2.1" }
+
+#firebase
+firebase-bom = { module = "com.google.firebase:firebase-bom", version.ref = "firebase-bom" }
+firebase-messaging = { module = "com.google.firebase:firebase-messaging" }
+firebase-analytics = { module = "com.google.firebase:firebase-analytics" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

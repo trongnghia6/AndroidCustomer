@@ -38,6 +38,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.navigation.NavType
 import androidx.navigation.navArgument
+import com.example.customerapp.presentation.notification.NotificationScreen
 import com.example.customerapp.presentation.orders.OrderDetailScreen
 import com.example.customerapp.presentation.service.ProviderDetailScreen
 import com.example.customerapp.presentation.service.ServiceDetailScreen
@@ -103,6 +104,7 @@ fun HomeScreenWrapper(
 
                 composable("profile_main") {
                     UserProfileView(
+                        onLogout = onLogout,
                         onAvatarClick = {
                             internalNavController.navigate("avatar_change")
                         }
@@ -209,6 +211,11 @@ fun HomeScreenWrapper(
                 composable("avatar_change") {
                     AvatarChangeScreen(
                         onBackClick = { internalNavController.popBackStack() }
+                    )
+                }
+                composable("notifications") {
+                    NotificationScreen(
+                        navController = internalNavController
                     )
                 }
             }

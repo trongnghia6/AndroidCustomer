@@ -11,6 +11,11 @@ import com.example.customerapp.data.model.User
 import io.github.jan.supabase.postgrest.from
 import io.github.jan.supabase.postgrest.query.Columns
 import kotlinx.coroutines.launch
+import android.content.Context
+import android.util.Log
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import io.github.jan.supabase.auth.auth
 
 class UserViewModel : ViewModel() {
     var user by mutableStateOf<User?>(null)
@@ -106,8 +111,115 @@ class UserViewModel : ViewModel() {
         }
     }
 
-    fun logout(onLogout: () -> Unit) {
-        // Xử lý đăng xuất (xóa token, dữ liệu,...)
-        onLogout()
+    /**
+     * Hàm xử lý đăng xuất hoàn chỉnh
+     * - Xóa tất cả dữ liệu SharedPreferences
+     * - Xóa Supabase auth session
+     * - Xóa FCM token khỏi database
+     * - Reset các state
+     */
+    fun logout(context: Context, onLogoutComplete: () -> Unit) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                Log.d("UserViewModel", "Starting logout process...")
+                
+                // 1. Lấy thông tin user trước khi xóa SharedPreferences
+                val sharedPref = context.getSharedPreferences("user_session", Context.MODE_PRIVATE)
+                val userId = sharedPref.getString("user_id", null)
+                val userName = sharedPref.getString("username", null)
+                
+                Log.d("UserViewModel", "Logging out user: $userName (ID: $userId)")
+                
+                // 2. Xóa FCM token khỏi database
+                if (!userId.isNullOrEmpty()) {
+                    try {
+                        supabase.from("user_push_tokens")
+                            .delete {
+                                filter {
+                                    eq("user_id", userId)
+                                }
+                            }
+                        Log.d("UserViewModel", "FCM tokens deleted for user: $userId")
+                    } catch (e: Exception) {
+                        Log.w("UserViewModel", "Could not delete FCM tokens: ${e.message}")
+                        // Không throw error vì việc này không quan trọng lắm
+                    }
+                }
+                
+                // 3. Xóa tất cả dữ liệu SharedPreferences
+                withContext(Dispatchers.Main) {
+                    sharedPref.edit().clear().apply()
+                    Log.d("UserViewModel", "All SharedPreferences data cleared")
+                }
+                
+                // 4. Xóa Supabase auth session
+                try {
+                    supabase.auth.signOut()
+                    Log.d("UserViewModel", "Supabase session cleared")
+                } catch (e: Exception) {
+                    Log.w("UserViewModel", "Could not clear Supabase session: ${e.message}")
+                    // Tiếp tục logout dù có lỗi
+                }
+                
+                // 5. Reset các state variables
+                withContext(Dispatchers.Main) {
+                    user = null
+                    isLoading = false
+                    errorMessage = null
+                    isEditing = false
+                    
+                    Log.d("UserViewModel", "Logout completed successfully - user: $userName")
+                    onLogoutComplete()
+                }
+                
+            } catch (e: Exception) {
+                Log.e("UserViewModel", "Error during logout: ${e.message}", e)
+                
+                // Ngay cả khi có lỗi, vẫn cố gắng xóa SharedPreferences và navigate
+                withContext(Dispatchers.Main) {
+                    try {
+                        val sharedPref = context.getSharedPreferences("user_session", Context.MODE_PRIVATE)
+                        sharedPref.edit().clear().apply()
+                        Log.d("UserViewModel", "SharedPreferences cleared (fallback)")
+                    } catch (clearError: Exception) {
+                        Log.e("UserViewModel", "Failed to clear SharedPreferences: ${clearError.message}")
+                    }
+                    
+                    // Reset state dù có lỗi
+                    user = null
+                    isLoading = false
+                    errorMessage = null
+                    isEditing = false
+                    
+                    onLogoutComplete()
+                }
+            }
+        }
+    }
+
+    /**
+     * Hàm test để verify logout success
+     * Kiểm tra xem tất cả dữ liệu SharedPreferences đã được xóa chưa
+     */
+    fun verifyLogoutSuccess(context: Context): Boolean {
+        val sharedPref = context.getSharedPreferences("user_session", Context.MODE_PRIVATE)
+        
+        val userId = sharedPref.getString("user_id", null)
+        val userName = sharedPref.getString("username", null)
+        val pendingFcmToken = sharedPref.getString("pending_fcm_token", null)
+        
+        val isLoggedOut = userId.isNullOrEmpty() && 
+                         userName.isNullOrEmpty() && 
+                         pendingFcmToken.isNullOrEmpty()
+        
+        Log.d("UserViewModel", "=== LOGOUT VERIFICATION ===")
+        Log.d("UserViewModel", "user_id: ${userId ?: "NULL"}")
+        Log.d("UserViewModel", "username: ${userName ?: "NULL"}")
+        Log.d("UserViewModel", "pending_fcm_token: ${pendingFcmToken ?: "NULL"}")
+        Log.d("UserViewModel", "Is completely logged out: $isLoggedOut")
+        Log.d("UserViewModel", "Current user state: ${user?.name ?: "NULL"}")
+        Log.d("UserViewModel", "===========================")
+        
+        return isLoggedOut
     }
 }

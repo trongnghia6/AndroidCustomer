@@ -30,6 +30,8 @@ android {
 
         val mapboxToken = localProperties["MAPBOX_ACCESS_TOKEN"] as? String ?: "null"
         buildConfigField("String", "MAPBOX_ACCESS_TOKEN", "\"$mapboxToken\"")
+        val supabaseToken = localProperties["SUPABASE_ANON_KEY"] as? String ?: "null"
+        buildConfigField("String", "SUPABASE_ANON_KEY", "\"$supabaseToken\"")
 //        buildConfigField("String", "MAPBOX_ACCESS_TOKEN", "\"${properties["MAPBOX_ACCESS_TOKEN"]}\"")
     }
 
@@ -130,6 +132,14 @@ dependencies {
     implementation(libs.coil.compose)
     implementation(libs.compose.foundation)
     implementation(libs.material.icons.extended)
+
+    //firebase
+    // BOM quản lý version
+    implementation(platform(libs.firebase.bom))
+
+    // Firebase Messaging
+    implementation(libs.firebase.messaging)
+    implementation(libs.firebase.analytics)
 
 
 }
