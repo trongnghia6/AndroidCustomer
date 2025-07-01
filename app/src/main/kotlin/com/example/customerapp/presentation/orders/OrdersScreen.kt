@@ -1,6 +1,10 @@
 package com.example.customerapp.presentation.orders
 
 import android.content.Context
+import android.content.BroadcastReceiver
+import android.content.Intent
+import android.content.IntentFilter
+import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -33,9 +37,7 @@ import io.github.jan.supabase.postgrest.query.Order
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-
-
-
+import com.example.customerapp.core.MyFirebaseMessagingService
 
 @Composable
 fun OrdersScreen(
@@ -49,26 +51,116 @@ fun OrdersScreen(
     var error by remember { mutableStateOf<String?>(null) }
     var selectedTab by remember { mutableStateOf(0) }
     val tabTitles = listOf("Đang đến", "Lịch sử", "Đã huỷ", "Đánh giá")
+    val scope = rememberCoroutineScope()
 
-    LaunchedEffect(userId) {
-        if (userId != null) {
+    // Function to load all data
+    suspend fun loadAll() {
+        Log.d("OrdersScreen", "Starting loadAll() function")
+        try {
             isLoading = true
-            CoroutineScope(Dispatchers.IO).launch {
+            Log.d("OrdersScreen", "Fetching bookings from Supabase")
+            val bookingResult = supabase.from("bookings").select {
+                order(column = "created_at", order = Order.DESCENDING)
+            }.decodeList<Booking>()
+            Log.d("OrdersScreen", "Received ${bookingResult.size} bookings from Supabase")
+            
+            orders = bookingResult.filter { it.customer_id == userId }
+            Log.d("OrdersScreen", "Filtered ${orders.size} bookings for user $userId")
+            
+            Log.d("OrdersScreen", "Fetching reviews from Supabase")
+            val reviewResult = supabase.from("service_ratings").select{
+                order(column = "created_at", order = Order.DESCENDING)
+            }.decodeList<Review>()
+            Log.d("OrdersScreen", "Received ${reviewResult.size} reviews from Supabase")
+            
+            reviews = reviewResult.filter { booking -> orders.any { it.id == booking.bookingId } }
+            Log.d("OrdersScreen", "Filtered ${reviews.size} reviews for user's bookings")
+        } catch (e: Exception) {
+            Log.e("OrdersScreen", "Error in loadAll: ${e.message}", e)
+            error = e.message
+        } finally {
+            isLoading = false
+            Log.d("OrdersScreen", "Completed loadAll() function")
+        }
+    }
+
+    // Create broadcast receiver
+    val broadcastReceiver = remember {
+        Log.d("OrdersScreen", "Creating new broadcast receiver instance")
+        object : BroadcastReceiver() {
+            init {
+                Log.d("OrdersScreen", "Initializing broadcast receiver object")
+            }
+            
+            override fun onReceive(context: Context?, intent: Intent?) {
+                Log.d("OrdersScreen", "🔔 Broadcast received in OrdersScreen")
                 try {
-                    val bookingResult = supabase.from("bookings").select {
-                        order(column = "created_at", order = Order.DESCENDING)
-                    }.decodeList<Booking>()
-                    orders = bookingResult.filter { it.customer_id == userId }
-                    val reviewResult = supabase.from("service_ratings").select{
-                        order(column = "created_at", order = Order.DESCENDING)
-                    }.decodeList<Review>()
-                    reviews = reviewResult.filter { booking -> orders.any { it.id == booking.bookingId } }
-                    isLoading = false
+                    Log.d("OrdersScreen", "Action: ${intent?.action}")
+                    Log.d("OrdersScreen", "Extras: ${intent?.extras?.keySet()?.joinToString()}")
+                    
+                    if (intent?.action == MyFirebaseMessagingService.NEW_NOTIFICATION_ACTION) {
+                        val notificationType = intent.getStringExtra(MyFirebaseMessagingService.EXTRA_NOTIFICATION_TYPE)
+                        Log.d("OrdersScreen", "📬 Received notification of type: $notificationType")
+                        
+                        scope.launch {
+                            try {
+                                Log.d("OrdersScreen", "🔄 Starting data reload")
+                                loadAll()
+                                Log.d("OrdersScreen", "✅ Data reload completed successfully")
+                            } catch (e: Exception) {
+                                Log.e("OrdersScreen", "❌ Error reloading data: ${e.message}", e)
+                                Log.e("OrdersScreen", "Stack trace: ", e)
+                            }
+                        }
+                    } else {
+                        Log.d("OrdersScreen", "⚠️ Unknown action received: ${intent?.action}")
+                    }
                 } catch (e: Exception) {
-                    error = e.message
-                    isLoading = false
+                    Log.e("OrdersScreen", "❌ Error in broadcast receiver: ${e.message}", e)
+                    Log.e("OrdersScreen", "Stack trace: ", e)
                 }
             }
+        }
+    }
+
+    // Register the broadcast receiver when the screen is first created
+    DisposableEffect(Unit) {
+        Log.d("OrdersScreen", "Starting DisposableEffect")
+        Log.d("OrdersScreen", "Current context: $context")
+
+        val intentFilter = IntentFilter(MyFirebaseMessagingService.NEW_NOTIFICATION_ACTION)
+        Log.d("OrdersScreen", "Created IntentFilter with action: ${intentFilter.actionsIterator().asSequence().toList()}")
+
+        try {
+            Log.d("OrdersScreen", "Attempting to register receiver")
+            context.registerReceiver(
+                broadcastReceiver,
+                intentFilter,
+                Context.RECEIVER_NOT_EXPORTED
+            )
+            Log.d("OrdersScreen", "Successfully registered broadcast receiver")
+        } catch (e: Exception) {
+            Log.e("OrdersScreen", "Failed to register receiver - ${e.message}")
+            Log.e("OrdersScreen", "Stack trace: ", e)
+        }
+
+        onDispose {
+            Log.d("OrdersScreen", "Starting onDispose")
+            try {
+                context.unregisterReceiver(broadcastReceiver)
+                Log.d("OrdersScreen", "Successfully unregistered receiver")
+            } catch (e: Exception) {
+                Log.e("OrdersScreen", "Error unregistering receiver - ${e.message}")
+                Log.e("OrdersScreen", "Stack trace: ", e)
+            }
+            Log.d("OrdersScreen", "Completed onDispose")
+        }
+    }
+
+    // Initial data load
+    LaunchedEffect(userId) {
+        if (userId != null) {
+            loadAll()
         }
     }
 
@@ -130,10 +222,9 @@ fun OrdersScreen(
             else -> {
                 val refreshOrders = {
                     if (userId != null) {
-                        CoroutineScope(Dispatchers.IO).launch {
+                        scope.launch {
                             try {
-                                val bookingResult = supabase.from("bookings").select().decodeList<Booking>()
-                                orders = bookingResult.filter { it.customer_id == userId }
+                                loadAll()
                             } catch (e: Exception) {
                                 error = e.message
                             }

@@ -6,6 +6,8 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.content.BroadcastReceiver
+import android.content.IntentFilter
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.google.firebase.messaging.FirebaseMessaging
@@ -19,6 +21,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerialName
 import androidx.core.content.edit
+import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -135,6 +138,7 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
     ) {
         serviceScope.launch {
             try {
+                Log.d("FCM", "🔄 Starting to save notification to database")
                 val jsonData = JsonObject(
                     data.mapValues { JsonPrimitive(it.value) }
                 )
@@ -147,19 +151,45 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
                     data = jsonData
                 )
 
-
                 supabase.postgrest
                     .from("notifications")
                     .insert(notification)
                 
-                Log.d("FCM", "Notification saved to database: $title")
+                Log.d("FCM", "✅ Notification saved to database: $title")
+                
+                // Gửi broadcast để thông báo cho UI
+                val broadcastIntent = Intent(NEW_NOTIFICATION_ACTION).apply {
+                    putExtra(EXTRA_NOTIFICATION_TYPE, type)
+                    addFlags(Intent.FLAG_INCLUDE_STOPPED_PACKAGES)
+                    `package` = applicationContext.packageName
+                }
+                
+                Log.d("FCM", "📢 Preparing to send broadcasts")
+                Log.d("FCM", "📢 Broadcast details:")
+                Log.d("FCM", "   - Action: ${broadcastIntent.action}")
+                Log.d("FCM", "   - Type: $type")
+                Log.d("FCM", "   - Package: ${broadcastIntent.`package`}")
+                Log.d("FCM", "   - Flags: ${broadcastIntent.flags}")
+                
+                try {
+                    // Send global broadcast
+                    applicationContext.sendBroadcast(broadcastIntent)
+                    Log.d("FCM", "✅ Successfully sent global broadcast")
+                } catch (e: Exception) {
+                    Log.e("FCM", "❌ Failed to send broadcast: ${e.message}", e)
+                    Log.e("FCM", "Stack trace: ", e)
+                }
             } catch (e: Exception) {
-                Log.e("FCM", "Error saving notification to database: ${e.message}")
+                Log.e("FCM", "❌ Error saving notification to database: ${e.message}")
+                Log.e("FCM", "Stack trace: ", e)
             }
         }
     }
 
     companion object {
+        // Broadcast constants
+        const val NEW_NOTIFICATION_ACTION = "com.example.customerapp.NEW_NOTIFICATION"
+        const val EXTRA_NOTIFICATION_TYPE = "notification_type"
         /**
          * Generate and upload FCM token for current user
          */

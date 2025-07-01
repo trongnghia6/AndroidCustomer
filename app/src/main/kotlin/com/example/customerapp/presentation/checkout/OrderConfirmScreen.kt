@@ -748,14 +748,14 @@ fun EnhancedDateTimePickerDialog(
     ) {
         Card(
             modifier = Modifier
-                .fillMaxWidth(0.95f)
-                .wrapContentHeight()
-                .padding(16.dp),
+                .fillMaxWidth(0.98f)
+                .fillMaxHeight(0.95f)
+                .padding(4.dp),
             shape = RoundedCornerShape(16.dp),
             elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
         ) {
             Column(
-                modifier = Modifier.padding(24.dp)
+                modifier = Modifier.padding(12.dp)
             ) {
                 // Header
                 Row(
@@ -776,7 +776,7 @@ fun EnhancedDateTimePickerDialog(
                     )
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(8.dp))
 
                 // Tab Row
                 TabRow(
@@ -797,19 +797,23 @@ fun EnhancedDateTimePickerDialog(
                     )
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(8.dp))
 
                 // Content
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(400.dp)
+                        .height(480.dp)
                 ) {
                     when (selectedTab) {
                         0 -> {
                             DatePicker(
                                 state = dateState,
-                                modifier = Modifier.fillMaxSize()
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(480.dp)
+                                    .padding(2.dp),
+                                showModeToggle = false
                             )
                         }
                         1 -> {
@@ -827,7 +831,7 @@ fun EnhancedDateTimePickerDialog(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(12.dp))
 
                 // Selected DateTime Display
                 Card(
@@ -836,9 +840,14 @@ fun EnhancedDateTimePickerDialog(
                         containerColor = MaterialTheme.colorScheme.primaryContainer
                     )
                 ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                ) {
                     Column(
-                        modifier = Modifier.padding(16.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
+                            modifier = Modifier.weight(1f)
                     ) {
                         Text(
                             text = "Thời gian đã chọn:",
@@ -865,35 +874,16 @@ fun EnhancedDateTimePickerDialog(
                             color = MaterialTheme.colorScheme.onPrimaryContainer
                         )
                     }
-                }
 
-                Spacer(modifier = Modifier.height(24.dp))
-
-                // Action Buttons
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    OutlinedButton(
-                        onClick = onDismissRequest,
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Close,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("Hủy")
-                    }
+                        Spacer(modifier = Modifier.width(12.dp))
 
                     Button(
                         onClick = {
                             val millis = dateState.selectedDateMillis
                             if (millis != null) {
                                 val selectedDate = Instant.ofEpochMilli(millis)
-                                    .atZone(ZoneId.of("Asia/Ho_Chi_Minh")
-                                    ).toLocalDate()
+                                        .atZone(ZoneId.of("Asia/Ho_Chi_Minh"))
+                                        .toLocalDate()
                                 val selectedTime = LocalTime.of(timeState.hour, timeState.minute)
                                 val selectedDateTime = LocalDateTime.of(selectedDate, selectedTime)
 
@@ -901,8 +891,7 @@ fun EnhancedDateTimePickerDialog(
                                     onConfirm(selectedDateTime)
                                 }
                             }
-                        },
-                        modifier = Modifier.weight(1f)
+                            }
                     ) {
                         Icon(
                             imageVector = Icons.Default.Check,
@@ -913,6 +902,9 @@ fun EnhancedDateTimePickerDialog(
                         Text("Xác nhận")
                     }
                 }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
             }
         }
     }

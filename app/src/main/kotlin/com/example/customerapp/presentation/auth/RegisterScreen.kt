@@ -333,7 +333,7 @@ private fun PersonalInfoSection(
                 trailingIcon = {
                     IconButton(onClick = onPasswordVisibilityChange) {
                         Icon(
-                            imageVector = if (passwordVisible) Icons.Default.Close else Icons.Default.Info,
+                            imageVector = if (passwordVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
                             contentDescription = if (passwordVisible) "Ẩn mật khẩu" else "Hiện mật khẩu",
                             tint = MaterialTheme.colorScheme.onSurfaceVariant
                         )
