@@ -12,7 +12,7 @@ import kotlinx.coroutines.launch
 import com.example.customerapp.BuildConfig
 import com.example.customerapp.core.network.MapboxGeocodingService
 import com.example.customerapp.core.network.MapboxPlace
-import com.example.customerapp.presentation.search.AddressAutoComplete
+import com.example.customerapp.ui.suggestion.AddressAutoComplete
 
 
 @Composable

@@ -1,5 +1,7 @@
 package com.example.customerapp.core.navigation
 
+import android.os.Build
+import androidx.annotation.RequiresApi
 import androidx.compose.runtime.*
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
@@ -7,21 +9,22 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.example.customerapp.core.network.MapboxGeocodingService
 import com.example.customerapp.core.network.RetrofitClient
-import com.example.customerapp.model.viewmodel.AuthViewModel
+import com.example.customerapp.ui.auth.AuthViewModel
 import com.example.customerapp.core.supabase
-import com.example.customerapp.presentation.auth.LoginScreen
-import com.example.customerapp.presentation.auth.RegisterScreen
-import com.example.customerapp.presentation.avatar.AvatarScreen
-import com.example.customerapp.presentation.search.MapboxSuggestionScreen
-import com.example.customerapp.screen.home.HomeScreenWrapper
+import com.example.customerapp.ui.auth.LoginScreen
+import com.example.customerapp.ui.auth.RegisterScreen
+import com.example.customerapp.ui.profile.AvatarScreen
+import com.example.customerapp.ui.suggestion.MapboxSuggestionScreen
+import com.example.customerapp.ui.home.HomeScreenWrapper
+import com.example.customerapp.ui.notifications.NotificationScreen
 import io.github.jan.supabase.auth.auth
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 
+@RequiresApi(Build.VERSION_CODES.TIRAMISU)
 @Composable
 fun AppNavigation(initialRoute: String? = null) {
     val navController = rememberNavController()
@@ -96,8 +99,7 @@ fun AppNavigation(initialRoute: String? = null) {
                     navController.navigate("login") {
                         popUpTo("home") { inclusive = true }
                     }
-                },
-                navController = navController
+                }
             )
         }
         
@@ -106,7 +108,7 @@ fun AppNavigation(initialRoute: String? = null) {
         }
         
         composable("notifications") {
-            com.example.customerapp.presentation.notification.NotificationScreen(
+            NotificationScreen(
                 navController = navController
             )
         }
