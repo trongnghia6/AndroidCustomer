@@ -141,5 +141,20 @@ dependencies {
     implementation(libs.firebase.messaging)
     implementation(libs.firebase.analytics)
 
+    //paypal
+    implementation(libs.okhttp.logging)
+    implementation(libs.coroutines.core)
+    implementation(libs.coroutines.android)
+    
+    // Custom Tabs for PayPal
+    implementation("androidx.browser:browser:1.8.0")
+    
+    // ViewModel and LiveData
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.9.0")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.9.0")
+    
+    // Compose runtime
+    implementation("androidx.compose.runtime:runtime:1.8.3")
+
 
 }

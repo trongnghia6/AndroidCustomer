@@ -13,11 +13,9 @@ import com.example.customerapp.core.supabase
 import com.example.customerapp.data.repository.NotificationService
 import android.util.Log
 import androidx.core.content.edit
-import com.example.customerapp.core.MyFirebaseMessagingService
 import com.example.customerapp.data.model.auth.AuthDtos
 import com.example.customerapp.data.repository.AuthRepository
 import io.github.jan.supabase.postgrest.from
-import io.github.jan.supabase.postgrest.query.Columns
 import io.github.jan.supabase.auth.auth
 
 

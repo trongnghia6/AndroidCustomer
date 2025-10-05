@@ -1,5 +1,8 @@
 package com.example.customerapp.ui.orders
 
+import android.annotation.SuppressLint
+import android.app.Activity
+import android.content.Intent
 import android.util.Log
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -13,6 +16,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import coil.compose.rememberAsyncImagePainter
@@ -33,15 +37,30 @@ import androidx.navigation.NavController
 import java.time.OffsetDateTime
 import java.time.format.DateTimeFormatter
 import android.content.Context
-import android.content.Intent
-import androidx.compose.ui.platform.LocalContext
 import android.content.BroadcastReceiver
 import android.content.IntentFilter
 import android.os.Build
 import androidx.annotation.RequiresApi
 import com.example.customerapp.core.MyFirebaseMessagingService
+import com.example.customerapp.data.model.Transaction
+import com.example.customerapp.data.repository.BookingPaypalRepository
+import com.example.customerapp.ui.checkout.BookingPaypalViewModel
+import com.example.customerapp.core.network.RetrofitInstance
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.compose.runtime.collectAsState
+import com.example.customerapp.data.model.BookingPaypalState
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.filled.Payment
+import androidx.compose.material.icons.filled.Report
+import androidx.core.net.toUri
+import com.example.customerapp.core.paypal.PayPalDeepLinkHandler
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.DisposableEffect
+import com.example.customerapp.ui.components.ReportDialog
 
 
+@SuppressLint("DefaultLocale")
 @RequiresApi(Build.VERSION_CODES.TIRAMISU)
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -52,11 +71,31 @@ fun OrderDetailScreen(
     var booking by remember { mutableStateOf<Booking?>(null) }
     var providerService by remember { mutableStateOf<ProviderService?>(null) }
     var provider by remember { mutableStateOf<User?>(null) }
+    var transaction by remember { mutableStateOf<Transaction?>(null) }
     var isRefreshing by remember { mutableStateOf(false) }
     var showCancelDialog by remember { mutableStateOf(false) }
+    var showReportDialog by remember { mutableStateOf(false) }
     val providerRepo = remember { ProviderServiceRepository() }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val scrollState = rememberScrollState()
+    
+    // Get user ID for reports
+    val userId = remember {
+        context.getSharedPreferences("user_session", Context.MODE_PRIVATE)
+            .getString("user_id", null)
+    }
+
+
+    // PayPal ViewModel
+    val paypalRepository = remember { BookingPaypalRepository(RetrofitInstance.api) }
+    val paypalViewModel: BookingPaypalViewModel = viewModel { BookingPaypalViewModel(paypalRepository) }
+    var showPaypalPayment by remember { mutableStateOf(false) }
+    
+    // PayPal Deep Link Handler
+    val paypalResult by PayPalDeepLinkHandler.paypalResult.collectAsState()
+    var processedOrderIds by remember { mutableStateOf(setOf<String>()) }
+
 
 
 
@@ -80,6 +119,21 @@ fun OrderDetailScreen(
                     ?: 0)
                 providerService = providerServiceResult
                 provider = providerServiceResult?.user
+                
+                // Load transaction information
+                try {
+                    val transactionResult = supabase.from("transactions").select {
+                        filter {
+                            eq("booking_id", orderId)
+                        }
+                    }.decodeList<Transaction>()
+                    
+                    if (transactionResult.isNotEmpty()) {
+                        transaction = transactionResult.first()
+                    }
+                } catch (e: Exception) {
+                    Log.e("OrderDetail", "Error loading transaction: ${e.message}", e)
+                }
             } catch (e: Exception) {
                 Log.e("OrderDetail", "Error loading booking detail: ${e.message}", e)
                 booking = null
@@ -160,9 +214,96 @@ fun OrderDetailScreen(
     LaunchedEffect(orderId) {
         loadAll()
     }
+    
+    // Handle PayPal payment results
+    val paypalUiState by paypalViewModel.uiState.collectAsState()
+    LaunchedEffect(paypalUiState) {
+        Log.d("OrderDetail", "PayPal UI State changed: $paypalUiState")
+        when (paypalUiState) {
+            is BookingPaypalState.OrderCaptured -> {
+                val orderCaptured = paypalUiState as BookingPaypalState.OrderCaptured
+                Log.d("OrderDetail", "PayPal Order Captured: status=${orderCaptured.status}, captureId=${orderCaptured.captureId}")
+                if (orderCaptured.status == "COMPLETED") {
+                    // Cập nhật transaction trong database thông qua ViewModel
+                    transaction?.let { trans ->
+                        trans.id ?: return@let
+                        Log.d("OrderDetail", "Updating payment result for bookingId=$orderId, captureId=${orderCaptured.captureId}")
+                        paypalViewModel.handleWebPaymentResult(
+                            bookingId = orderId,
+                            captureId = orderCaptured.captureId,
+                            paypalOrderId = trans.paypalOrderId
+                        )
+                        
+                        // Reload data to reflect changes
+                        loadAll()
+                    }
+                } else {
+                    Log.w("OrderDetail", "PayPal payment not completed, status: ${orderCaptured.status}")
+                }
+            }
+            is BookingPaypalState.Error -> {
+                Log.e("OrderDetail", "PayPal error: ${(paypalUiState as BookingPaypalState.Error).message}")
+            }
+            is BookingPaypalState.Loading -> {
+                Log.d("OrderDetail", "PayPal payment in progress...")
+            }
+            else -> {
+                Log.d("OrderDetail", "PayPal state: $paypalUiState")
+            }
+        }
+    }
+
+    // Xử lý PayPal Deep Link Result
+    LaunchedEffect(paypalResult) {
+        paypalResult?.let { result ->
+            Log.d("OrderDetail", "PayPal deep link result: $result")
+            
+            // Clear the result immediately to prevent multiple processing
+            PayPalDeepLinkHandler.clearResult()
+            
+            when (result.status) {
+                "success" -> {
+                    if (result.orderId != null && !processedOrderIds.contains(result.orderId)) {
+                        Log.d("OrderDetail", "PayPal payment successful, capturing order: ${result.orderId}")
+                        processedOrderIds = processedOrderIds + result.orderId
+                        
+                        // Capture order để lấy capture ID
+                        paypalViewModel.captureOrder(result.orderId)
+                    } else if (result.orderId != null) {
+                        Log.d("OrderDetail", "Order ${result.orderId} already processed, skipping capture")
+                    }
+                }
+                "failed" -> {
+                    Log.d("OrderDetail", "PayPal payment failed")
+                    // Có thể hiển thị thông báo lỗi cho user
+                }
+                "cancelled" -> {
+                    Log.d("OrderDetail", "PayPal payment cancelled")
+                    // Có thể hiển thị thông báo hủy cho user
+                }
+            }
+        }
+    }
+
     fun cancelOrder() {
         scope.launch {
             try {
+                // Nếu có transaction PayPal và đã thanh toán thành công, thực hiện hoàn tiền
+                transaction?.let { trans ->
+                    if (trans.paymentMethod == "Paypal" && 
+                        trans.status == "completed" &&
+                        trans.captureId != null) {
+                        try {
+                            Log.d("OrderDetail", "Processing PayPal refund for captureId: ${trans.captureId}")
+                            val refundResponse = paypalRepository.refundCapture(trans.captureId!!)
+                            Log.d("OrderDetail", "PayPal refund response: $refundResponse")
+                        } catch (e: Exception) {
+                            Log.e("OrderDetail", "Error processing PayPal refund: ${e.message}", e)
+                        }
+                    }
+                }
+                
+                // Cập nhật trạng thái booking thành cancelled
                 supabase.from("bookings").update({
                     set("status", "cancelled")
                 }) {
@@ -170,12 +311,45 @@ fun OrderDetailScreen(
                         eq("id", orderId)
                     }
                 }
+                
+                // Cập nhật trạng thái transaction thành cancelled
+                transaction?.let { trans ->
+                    trans.id ?: return@let
+                    supabase.from("transactions").update({
+                        set("status", "refunded")
+                    }) {
+                        filter {
+                            eq("id", trans.id)
+                        }
+                    }
+                }
+                
                 // Sau khi huỷ thành công, quay về trang danh sách đơn hàng
                 navController.navigate("orders_main") {
                     popUpTo("orders_main") { inclusive = true }
                 }
             } catch (e: Exception) {
                 Log.e("OrderDetail", "Error cancelling order: ${e.message}", e)
+            }
+        }
+    }
+
+    fun handlePayPalPayment() {
+        transaction?.let { trans ->
+            if (trans.paypalOrderId != null) {
+                // Mở PayPal URL ngay lập tức để tăng tốc độ phản hồi
+                Log.d("OrderDetail", "🚀 Fast opening PayPal payment for order: ${trans.paypalOrderId}")
+                val paypalUrl = "https://www.sandbox.paypal.com/checkoutnow?token=${trans.paypalOrderId}"
+                paypalViewModel.openPaypalUrlFast(context, paypalUrl)
+                
+                // Delegate to ViewModel để xử lý business logic
+                paypalViewModel.openPayPalWebPayment(
+                    context = context,
+                    paypalOrderId = trans.paypalOrderId,
+                    bookingId = orderId
+                )
+            } else {
+                Log.e("OrderDetail", "PayPal Order ID is null")
             }
         }
     }
@@ -190,7 +364,8 @@ fun OrderDetailScreen(
 
         Column(modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFFF8F8F8))) {
+            .background(Color(0xFFF8F8F8))
+            .verticalScroll(scrollState)) {
 
             CenterAlignedTopAppBar(
                 title = { Text("Chi tiết đơn hàng") },
@@ -279,12 +454,24 @@ fun OrderDetailScreen(
                                 )
                             }
                             Spacer(Modifier.weight(1f))
-                            Text(
-                                "${providerService?.customPrice?.toInt() ?: 0}đ",
-                                style = MaterialTheme.typography.titleMedium,
-                                color = Color(0xFFFF5722),
-                                fontWeight = FontWeight.Bold
-                            )
+                            
+                            // Report button
+                            IconButton(
+                                onClick = { showReportDialog = true },
+                                modifier = Modifier
+                                    .size(40.dp)
+                                    .background(
+                                        Color(0xFF1976D2).copy(alpha = 0.1f),
+                                        CircleShape
+                                    )
+                            ) {
+                                Icon(
+                                    Icons.Default.Report,
+                                    contentDescription = "Báo cáo vấn đề",
+                                    tint = Color(0xFF1976D2),
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
                         }
 
                         Spacer(Modifier.height(16.dp))
@@ -358,6 +545,135 @@ fun OrderDetailScreen(
                     }
                 }
 
+                // Thông tin thanh toán
+                transaction?.let { trans ->
+                    Spacer(Modifier.height(16.dp))
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        elevation = CardDefaults.cardElevation(2.dp)
+                    ) {
+                        Column(Modifier.padding(16.dp)) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.padding(bottom = 8.dp)
+                            ) {
+                                Icon(Icons.Default.Payment, contentDescription = null, tint = Color(0xFF1976D2))
+                                Spacer(Modifier.width(8.dp))
+                                Text("Thông tin thanh toán", fontWeight = FontWeight.Bold)
+                                Log.d("OrderDetail", "Displaying transaction info: $trans")
+                            }
+                            
+                            HorizontalDivider(Modifier.padding(vertical = 8.dp))
+                            
+                            Row {
+                                Text("Phương thức:", modifier = Modifier.weight(1f))
+                                Text(
+                                    when (trans.paymentMethod) {
+                                        "Paypal" -> "PayPal"
+                                        "Tiền mặt" -> "Tiền mặt"
+                                        else -> trans.paymentMethod ?: "Không xác định"
+                                    },
+                                    fontWeight = FontWeight.Medium
+                                )
+                            }
+                            
+                            Row {
+                                Text("Số tiền:", modifier = Modifier.weight(1f))
+                                Text(
+                                    "${String.format("%.0f", trans.amount)}₫",
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFFE53935)
+                                )
+                            }
+                            
+                            Row {
+                                Text("Trạng thái thanh toán:", modifier = Modifier.weight(1f))
+                                Text(
+                                    when {
+                                        trans.paymentMethod == "Paypal" -> {
+                                            when (trans.status) {
+                                                "completed" -> "Đã thanh toán"
+                                                "pending" -> "Chưa thanh toán"
+                                                "refunded" -> "Đã hoàn tiền"
+                                                else -> "Chưa thanh toán"
+                                            }
+                                        }
+                                        trans.status == "completed" -> "Đã thanh toán"
+                                        trans.status == "pending" -> "Chưa thanh toán"
+                                        trans.status == "cancelled" -> "Đã hủy"
+                                        else -> "Không xác định"
+                                    },
+                                    color = when {
+                                        trans.paymentMethod == "Paypal" && trans.status == "completed" -> Color(0xFF4CAF50)
+                                        trans.paymentMethod == "Paypal" && trans.status == "pending" -> Color(0xFFFF9800)
+                                        trans.paymentMethod == "Paypal" && trans.status == "refunded" -> Color(0xFF2196F3)
+                                        trans.status == "completed" -> Color(0xFF4CAF50)
+                                        trans.status == "pending" -> Color(0xFFFF9800)
+                                        else -> Color.Gray
+                                    },
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                            
+//                            // Hiển thị PayPal Order ID nếu có
+//                            trans.paypalOrderId?.let { orderId ->
+//                                Row {
+//                                    Text("PayPal Order ID:", modifier = Modifier.weight(1f))
+//                                    Text(
+//                                        orderId,
+//                                        fontWeight = FontWeight.Medium,
+//                                        fontSize = MaterialTheme.typography.bodySmall.fontSize
+//                                    )
+//                                }
+//                            }
+//
+//                            // Hiển thị Payout ID nếu có
+//                            trans.payoutId?.let { payoutId ->
+//                                Row {
+//                                    Text("Payout ID:", modifier = Modifier.weight(1f))
+//                                    Text(
+//                                        payoutId,
+//                                        fontWeight = FontWeight.Medium,
+//                                        fontSize = MaterialTheme.typography.bodySmall.fontSize,
+//                                        color = Color(0xFF4CAF50)
+//                                    )
+//                                }
+//                            }
+//
+//                            // Hiển thị Provider Services ID nếu có
+//                            trans.providerServicesId?.let { providerServiceId ->
+//                                Row {
+//                                    Text("Provider Service ID:", modifier = Modifier.weight(1f))
+//                                    Text(
+//                                        providerServiceId.toString(),
+//                                        fontWeight = FontWeight.Medium,
+//                                        fontSize = MaterialTheme.typography.bodySmall.fontSize
+//                                    )
+//                                }
+//                            }
+                        }
+                    }
+                }
+
+                // Nút thanh toán PayPal nếu chưa thanh toán
+                transaction?.let { trans ->
+                    if (trans.paymentMethod == "Paypal" && 
+                        trans.status != "completed" &&
+                        booking!!.status != "cancelled") {
+                        Spacer(Modifier.height(16.dp))
+                        Button(
+                            onClick = { handlePayPalPayment() },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1976D2))
+                        ) {
+                            Icon(Icons.Default.Payment, contentDescription = null)
+                            Spacer(Modifier.width(8.dp))
+                            Text("Thanh toán PayPal", color = Color.White)
+                        }
+                    }
+                }
+
                 // Cancel button
                 if (booking!!.status == "pending") {
                     Spacer(Modifier.height(16.dp))
@@ -390,6 +706,20 @@ fun OrderDetailScreen(
                     TextButton(onClick = { showCancelDialog = false }) {
                         Text("Huỷ")
                     }
+                }
+            )
+        }
+        
+        // Report dialog
+        if (showReportDialog && userId != null) {
+            ReportDialog(
+                bookingId = orderId.toLong(),
+                providerId = providerService?.providerId ?: "",
+                userId = userId,
+                onDismiss = { showReportDialog = false },
+                onSuccess = {
+                    // Optionally show success message
+                    showReportDialog = false
                 }
             )
         }

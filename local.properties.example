@@ -1,0 +1,16 @@
+# Example local.properties file
+# Copy this to local.properties and fill in your actual values
+
+# Mapbox
+MAPBOX_ACCESS_TOKEN=your_mapbox_token_here
+
+# Supabase
+SUPABASE_ANON_KEY=your_supabase_anon_key_here
+SUPABASE_URL=your_supabase_url_here
+
+# PayPal ngrok URL (thay bằng ngrok URL thực tế của bạn)
+NGROK_URL=https://your-actual-ngrok-url.ngrok-free.app
+
+# PayPal Sandbox Credentials (optional - chỉ dùng nếu cần)
+PAYPAL_CLIENT_ID=your_paypal_client_id_here
+PAYPAL_CLIENT_SECRET=your_paypal_client_secret_here

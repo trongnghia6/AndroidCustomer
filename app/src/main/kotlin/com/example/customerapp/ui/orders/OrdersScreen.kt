@@ -41,6 +41,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import com.example.customerapp.core.MyFirebaseMessagingService
+import com.example.customerapp.data.repository.BookingPaypalRepository
+import com.example.customerapp.core.network.RetrofitInstance
 
 @RequiresApi(Build.VERSION_CODES.TIRAMISU)
 @Composable
@@ -296,6 +298,7 @@ fun OrderList(
     onRefresh: (() -> Unit)? = null
 ) {
     val providerRepo = remember { ProviderServiceRepository() }
+    val bookingPaypalRepo = remember { BookingPaypalRepository(RetrofitInstance.api) }
     var isUpdating by remember { mutableStateOf<Long?>(null) }
     
     // Function to update order status
@@ -310,6 +313,12 @@ fun OrderList(
                         eq("id", orderId) // Only allow update if current status is accepted
                     }
                 } // Refresh page after update
+            
+            // Gọi payout khi cập nhật trạng thái đơn hàng thành "completed"
+            if (newStatus == "completed" || newStatus == "c-confirmed") {
+                bookingPaypalRepo.processPayoutForCompletedOrder(orderId.toInt())
+            }
+            
             onRefresh?.invoke()
         } catch (e: Exception) {
             Log.e("OrderList", "Error updating order status: ${e.message}", e)

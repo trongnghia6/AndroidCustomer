@@ -1,3 +1,5 @@
+@file:Suppress("UNCHECKED_CAST")
+
 package com.example.customerapp.ui.checkout
 
 import androidx.compose.foundation.layout.*
@@ -43,11 +45,16 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import java.util.Locale
-import android.app.Activity
-import android.content.Intent
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
-import android.content.pm.PackageManager
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.customerapp.core.network.RetrofitInstance
+import com.example.customerapp.data.repository.BookingPaypalRepository
+import com.example.customerapp.ui.components.VoucherSelectionDialog
+import com.example.customerapp.data.model.Voucher
+import com.example.customerapp.data.repository.VoucherRepository
+import androidx.compose.runtime.collectAsState
+import androidx.compose.material3.CircularProgressIndicator
+import com.example.customerapp.data.model.BookingPaypalState
+import com.example.customerapp.core.paypal.PayPalDeepLinkHandler
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -61,8 +68,19 @@ fun OrderConfirmScreen(
     onBackClick: () -> Unit = {}
 ) {
     val context = LocalContext.current
-    val serviceFee = 6000.0
     var selectedPayment by remember { mutableStateOf("MoMo") }
+
+
+
+
+    // PayPal ViewModel
+    val paypalRepository = remember { BookingPaypalRepository(RetrofitInstance.api) }
+    val paypalViewModel: BookingPaypalViewModel = viewModel { BookingPaypalViewModel(paypalRepository) }
+    val paypalUiState by paypalViewModel.uiState.collectAsState()
+    
+    // PayPal Deep Link Handler
+    val paypalResult by PayPalDeepLinkHandler.paypalResult.collectAsState()
+    var processedOrderIds by remember { mutableStateOf(setOf<String>()) }
     val userId = remember {
         context.getSharedPreferences("user_session", Context.MODE_PRIVATE)
             .getString("user_id", null)
@@ -70,31 +88,19 @@ fun OrderConfirmScreen(
     var isPlacingOrder by remember { mutableStateOf(false) }
     var orderSuccess by remember { mutableStateOf(false) }
     var orderError by remember { mutableStateOf<String?>(null) }
-
-    // State để lưu kết quả MoMo
-    var momoPaymentSuccess by remember { mutableStateOf(false) }
-    var momoPaymentError by remember { mutableStateOf<String?>(null) }
-
-    // Thêm state để báo lỗi khi không có app MoMo
-    var momoAppNotInstalled by remember { mutableStateOf(false) }
-
-    // Launcher để nhận kết quả từ MoMo
-    val momoLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.StartActivityForResult()
-    ) { result ->
-        if (result.resultCode == Activity.RESULT_OK && result.data != null) {
-            val data = result.data!!
-            val status = data.getIntExtra("status", -1)
-            if (status == 0) {
-                momoPaymentSuccess = true
-                momoPaymentError = null
-            } else {
-                momoPaymentSuccess = false
-                momoPaymentError = data.getStringExtra("message") ?: "Thanh toán thất bại"
-            }
-        } else {
-            momoPaymentSuccess = false
-            momoPaymentError = "Thanh toán bị huỷ hoặc thất bại"
+    
+    // Voucher state
+    val voucherRepository = remember { VoucherRepository() }
+    var availableVouchers by remember { mutableStateOf<List<Voucher>>(emptyList()) }
+    var selectedVoucher by remember { mutableStateOf<Voucher?>(null) }
+    var showVoucherDialog by remember { mutableStateOf(false) }
+    
+    // Load vouchers on startup
+    LaunchedEffect(Unit) {
+        try {
+            availableVouchers = voucherRepository.getActiveVouchers()
+        } catch (e: Exception) {
+            Log.e("OrderConfirmScreen", "Error loading vouchers: ${e.message}", e)
         }
     }
 
@@ -116,7 +122,8 @@ fun OrderConfirmScreen(
     } else 0.0
     val numWorkers = selectedWorkers.toIntOrNull() ?: 1
     val calculatedPrice = price * durationHours * numWorkers
-    val total = calculatedPrice + serviceFee
+    val voucherDiscount = (selectedVoucher?.getDiscountAmount(calculatedPrice)?.times(100)) ?: 0.0
+    val total = calculatedPrice - voucherDiscount
 
 
     // Kiểm tra số lượng người được chọn
@@ -361,6 +368,63 @@ fun OrderConfirmScreen(
             }
         }
 
+        // Voucher selection item
+        item {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .shadow(8.dp, RoundedCornerShape(16.dp)),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFFF3E5F5))
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Mã giảm giá",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = MaterialTheme.typography.titleMedium.fontSize
+                            )
+                            Text(
+                                text = if (selectedVoucher != null) {
+                                    "${selectedVoucher!!.name} - Giảm ${selectedVoucher!!.discount*100}%"
+                                } else {
+                                    "Chọn mã giảm giá"
+                                },
+                                color = if (selectedVoucher != null) Color(0xFFE53935) else Color.Gray,
+                                fontSize = MaterialTheme.typography.bodyMedium.fontSize
+                            )
+                        }
+                        androidx.compose.material3.TextButton(
+                            onClick = { showVoucherDialog = true }
+                        ) {
+                            Text(
+                                text = if (selectedVoucher != null) "Đổi" else "Chọn",
+                                color = Color(0xFF9C27B0)
+                            )
+                        }
+                    }
+                    if (voucherDiscount > 0) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween) {
+                            Text(
+                                text = "Giảm giá",
+                                color = Color(0xFFE53935)
+                            )
+                            Text(
+                                text = "-${String.format(Locale("vi", "VN"),"%,.0f₫", voucherDiscount)}",
+                                fontWeight = FontWeight.Medium,
+                                color = Color(0xFFE53935)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
         item {
             Card(
                 modifier = Modifier
@@ -379,13 +443,6 @@ fun OrderConfirmScreen(
                         Text(text = "Phí đơn hàng")
                         Text(
                             text = String.format(Locale("vi", "VN"),"%,.0f₫", calculatedPrice),
-                            fontWeight = FontWeight.Medium
-                        )
-                    }
-                    Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween) {
-                        Text(text = "Phí dịch vụ")
-                        Text(
-                            text = "6.000₫",
                             fontWeight = FontWeight.Medium
                         )
                     }
@@ -414,15 +471,15 @@ fun OrderConfirmScreen(
             Spacer(Modifier.height(8.dp))
             Row(Modifier.fillMaxWidth(), Arrangement.spacedBy(8.dp)) {
                 Button(
-                    onClick = { selectedPayment = "MoMo" },
+                    onClick = { selectedPayment = "Paypal" },
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = if (selectedPayment == "MoMo") Color(0xFFFF5722) else MaterialTheme.colorScheme.surfaceVariant
+                        containerColor = if (selectedPayment == "Paypal") Color(0xFFFF5722) else MaterialTheme.colorScheme.surfaceVariant
                     ),
                     modifier = Modifier.weight(1f)
                 ) {
                     Text(
-                        text = "MoMo",
-                        color = if (selectedPayment == "MoMo") Color.White else Color.Black
+                        text = "Paypal",
+                        color = if (selectedPayment == "Paypal") Color.White else Color.Black
                     )
                 }
                 Button(
@@ -443,39 +500,11 @@ fun OrderConfirmScreen(
         item {
             Button(
                 onClick = {
-                    if (selectedPayment == "MoMo") {
-                        // Kiểm tra app MoMo đã cài chưa
-                        val momoPackage = "com.mservice.momotransfer"
-                        val pm = context.packageManager
-                        val momoInstalled = try {
-                            pm.getPackageInfo(momoPackage, PackageManager.GET_ACTIVITIES)
-                            true
-                        } catch (e: Exception) {
-                            Log.e("MoMoCheck", "App MoMo không được cài đặt: ${e.message}")
-                            false
-                        }
-                        if (!momoInstalled) {
-                            momoAppNotInstalled = true
-                            return@Button
-                        }
-                        // Gọi SDK MoMo
-                        val momoIntent = Intent("com.momo.payment")
-                        momoIntent.putExtra("merchantName", "Tên Merchant")
-                        momoIntent.putExtra("merchantCode", "Mã Merchant")
-                        momoIntent.putExtra("amount", total.toLong())
-                        momoIntent.putExtra("orderId", System.currentTimeMillis().toString())
-                        momoIntent.putExtra("orderLabel", "Thanh toán dịch vụ")
-                        momoIntent.putExtra("description", "Thanh toán qua MoMo")
-                        momoIntent.putExtra("fee", 0)
-                        momoIntent.putExtra("extra", "")
-                        momoIntent.putExtra("requestId", System.currentTimeMillis().toString())
-                        momoIntent.putExtra("partnerCode", "Mã Partner")
-                        momoIntent.putExtra("partnerName", "Tên Partner")
-                        momoIntent.putExtra("appScheme", "momo")
-                        // ...các tham số khác nếu cần...
-
-                        momoLauncher.launch(momoIntent)
-                    } else {
+                    if(selectedPayment == "Paypal"){
+                        // Sử dụng ViewModel để tạo PayPal order
+                        Log.d("PayPal", "Bắt đầu tạo PayPal order với amount: $total USD")
+                        paypalViewModel.createOrder(total, "USD")
+                    } else{
                         // Thanh toán tiền mặt: tạo booking luôn
                         if (userId != null && providerServiceId != 0) {
                             isPlacingOrder = true
@@ -575,27 +604,56 @@ fun OrderConfirmScreen(
             }
         }
 
-        item {
-            // Hiển thị kết quả MoMo
-            momoPaymentError?.let {
-                Text(
-                    text = "Lỗi MoMo: $it",
-                    color = Color.Red,
-                    modifier = Modifier.fillMaxWidth(),
-                    textAlign = TextAlign.Center
-                )
-            }
-        }
 
         item {
-            // Hiển thị lỗi nếu không có app MoMo
-            if (momoAppNotInstalled) {
-                Text(
-                    text = "Bạn chưa cài đặt ứng dụng MoMo. Vui lòng cài đặt MoMo để sử dụng chức năng này.",
-                    color = Color.Red,
-                    modifier = Modifier.fillMaxWidth(),
-                    textAlign = TextAlign.Center
-                )
+            // Hiển thị trạng thái PayPal
+            when (paypalUiState) {
+                is BookingPaypalState.Loading -> {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(16.dp),
+                            strokeWidth = 2.dp,
+                            color = Color(0xFF1976D2)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Đang xử lý PayPal...",
+                            color = Color(0xFF1976D2),
+                            fontSize = MaterialTheme.typography.bodyMedium.fontSize
+                        )
+                    }
+                }
+                is BookingPaypalState.Error -> {
+                    Text(
+                        text = "Lỗi PayPal: ${(paypalUiState as BookingPaypalState.Error).message}",
+                        color = Color.Red,
+                        modifier = Modifier.fillMaxWidth(),
+                        textAlign = TextAlign.Center
+                    )
+                }
+                is BookingPaypalState.OrderCreated -> {
+                    Text(
+                        text = "Đã mở PayPal. Vui lòng hoàn tất thanh toán.",
+                        color = Color(0xFF388E3C),
+                        modifier = Modifier.fillMaxWidth(),
+                        textAlign = TextAlign.Center
+                    )
+                }
+                is BookingPaypalState.OrderCaptured -> {
+                    if ((paypalUiState as BookingPaypalState.OrderCaptured).status == "COMPLETED") {
+                        Text(
+                            text = "Thanh toán PayPal thành công!",
+                            color = Color(0xFF388E3C),
+                            modifier = Modifier.fillMaxWidth(),
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                }
+                else -> {}
             }
         }
 
@@ -616,62 +674,80 @@ fun OrderConfirmScreen(
         }
     }
 
-    // Khi thanh toán MoMo thành công thì tạo booking
-    LaunchedEffect(momoPaymentSuccess) {
-        if (momoPaymentSuccess && userId != null && providerServiceId != 0) {
-            isPlacingOrder = true
-            CoroutineScope(Dispatchers.IO).launch {
-                try {
-                    val startAtDateTime = startDateTime?.atOffset(ZoneOffset.ofHours(7))
-                        ?: OffsetDateTime.now(ZoneOffset.ofHours(7))
+    // Xử lý PayPal UI State với tối ưu tốc độ
+    LaunchedEffect(paypalUiState) {
+        Log.d("OrderConfirmScreen", "PayPal UI State changed: $paypalUiState")
+        when (paypalUiState) {
+            is BookingPaypalState.OrderCreated -> {
+                val state = paypalUiState as BookingPaypalState.OrderCreated
+                Log.d("OrderConfirmScreen", "🚀 Fast processing OrderCreated state with approvalUrl: ${state.approvalUrl}")
+                
+                // Mở PayPal URL ngay lập tức để tăng tốc độ phản hồi
+                paypalViewModel.openPaypalUrlFast(context, state.approvalUrl)
+                
+                // Xử lý tạo booking trong background
+                paypalViewModel.handleOrderCreated(
+                    userId = userId ?: "",
+                    providerServiceId = providerServiceId,
+                    address = address,
+                    startAt = startDateTime ?: now,
+                    endAt = endDateTime,
+                    durationMinutes = durationMinutes,
+                    total = total,
+                    numWorkers = selectedWorkers,
+                    approvalUrl = state.approvalUrl,
+                    context = context
+                )
+                Log.d("OrderConfirmScreen", "✅ Fast processing completed")
+            }
 
-                    val endAtDateTime = endDateTime?.atOffset(ZoneOffset.ofHours(7))
-                        ?: startAtDateTime.plusMinutes(durationMinutes?.toLong() ?: 60L)
+            is BookingPaypalState.OrderCaptured -> {
+                val orderCaptured = paypalUiState as BookingPaypalState.OrderCaptured
+                val captureId = orderCaptured.captureId
+                val paypalOrderId = orderCaptured.orderId
+                
+                // Xử lý kết quả thanh toán thông qua ViewModel
+                paypalViewModel.handleWebPaymentResult(
+                    bookingId = paypalViewModel.getBookingId() ?: 0,
+                    captureId = captureId,
+                    paypalOrderId = paypalOrderId
+                )
+            }
 
-                    val formatter = DateTimeFormatter.ISO_OFFSET_DATE_TIME
-                    val startAt = startAtDateTime.format(formatter)
-                    val endAt = endAtDateTime.format(formatter)
-                    val numWorkers = selectedWorkers.toIntOrNull() ?: 1
+            is BookingPaypalState.Error -> {
+                paypalViewModel.orderError = (paypalUiState as BookingPaypalState.Error).message
+            }
 
-                    val booking = BookingInsert(
-                        customerId = userId,
-                        providerServiceId = providerServiceId,
-                        status = "pending",
-                        location = address,
-                        startAt = startAt,
-                        endAt = endAt,
-                        numWorkers = numWorkers
-                    )
+            else -> {}
+        }
+    }
 
-                    val bookingResult = supabase.from("bookings")
-                        .insert(booking) {
-                            select() // Trả về toàn bộ bản ghi sau khi insert
-                        }
 
-                    // Lấy ID từ kết quả
-                    val insertedBooking = bookingResult.decodeSingle<BookingResponse>()
-                    val bookingId = insertedBooking.id
-                    val transaction = Transaction(
-                        bookingId = bookingId,
-                        amount = total,
-                        status = "pending",
-                        paymentMethod = selectedPayment
-                    )
-
-                    supabase.from("transactions").insert(transaction)
-
-                    withContext(Dispatchers.Main) {
-                        isPlacingOrder = false
-                        orderSuccess = true
-                        momoPaymentSuccess = false // reset
+    // Xử lý PayPal Deep Link Result
+    LaunchedEffect(paypalResult) {
+        paypalResult?.let { result ->
+            Log.d("OrderConfirmScreen", "PayPal deep link result: $result")
+            
+            // Clear the result immediately to prevent multiple processing
+            PayPalDeepLinkHandler.clearResult()
+            
+            when (result.status) {
+                "success" -> {
+                    if (result.orderId != null && !processedOrderIds.contains(result.orderId)) {
+                        Log.d("OrderConfirmScreen", "PayPal payment successful, capturing order: ${result.orderId}")
+                        processedOrderIds = processedOrderIds + result.orderId
+                        paypalViewModel.captureOrder(result.orderId)
+                    } else if (result.orderId != null) {
+                        Log.d("OrderConfirmScreen", "Order ${result.orderId} already processed, skipping capture")
                     }
-                } catch (e: Exception) {
-                    withContext(Dispatchers.Main) {
-                        isPlacingOrder = false
-                        orderError = e.message
-                        momoPaymentSuccess = false // reset
-                        Log.e("BookingError", "Lỗi đặt đơn: ${e.message}", e)
-                    }
+                }
+                "failed" -> {
+                    Log.d("OrderConfirmScreen", "PayPal payment failed")
+                    orderError = "Thanh toán PayPal thất bại"
+                }
+                "cancelled" -> {
+                    Log.d("OrderConfirmScreen", "PayPal payment cancelled")
+                    orderError = "Thanh toán PayPal bị hủy"
                 }
             }
         }
@@ -702,6 +778,18 @@ fun OrderConfirmScreen(
                 endDateTime = dateTime
                 showEndDateTimePicker = false
             }
+        )
+    }
+
+    // Voucher selection dialog
+    if (showVoucherDialog) {
+        VoucherSelectionDialog(
+            vouchers = availableVouchers,
+            selectedVoucher = selectedVoucher,
+            onVoucherSelected = { voucher ->
+                selectedVoucher = voucher
+            },
+            onDismiss = { showVoucherDialog = false }
         )
     }
 }
@@ -952,5 +1040,3 @@ suspend fun findAvailableWorkers(
     }
 }
 
-// Hiện tại, khi chọn "MoMo", chỉ lưu thông tin vào transaction chứ chưa tích hợp SDK MoMo.
-// Nếu muốn thanh toán MoMo thực tế, cần tích hợp SDK MoMo và xử lý callback thanh toán thành công.

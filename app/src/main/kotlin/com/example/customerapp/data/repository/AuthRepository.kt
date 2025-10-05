@@ -34,6 +34,7 @@ class AuthRepository {
                         eq("email", email)
                         eq("password", password)
                         eq("role", "customer")
+                        eq("lock", "active")
                     }
                 }
                 .decodeList<AuthDtos.UserSignIn>()
