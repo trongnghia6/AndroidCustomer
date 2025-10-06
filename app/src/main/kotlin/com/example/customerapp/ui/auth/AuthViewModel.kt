@@ -32,42 +32,48 @@ class AuthViewModel : ViewModel() {
     var isSignUpSuccess by mutableStateOf<Boolean?>(null)
         private set
 
-    suspend fun countUsersByEmail(email: String): Int = authRepository.countCustomerUsersByEmail(email);
+    suspend fun countUsersByEmail(email: String): Int = authRepository.countCustomerUsersByEmail(email)
 
     fun signIn(email: String, password: String, context: Context,onSuccess: () -> Unit) {
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 val user =  authRepository.signInCustomer(email, password)
                 if (user != null){
-                    val sharedPref = context.getSharedPreferences("user_session", Context.MODE_PRIVATE)
-                    val userId = user.id
-                    val userName = user.name
-                    sharedPref.edit {
-                        putString("user_id", userId)
-                        putString("username", userName)
-                    }
-
-                    // Gửi thông báo đăng nhập thành công và generate FCM token
-                    launch {
-                        try {
-                            val success = notificationService.sendLoginSuccessNotification(userId, userName)
-                            if (success) {
-                                Log.d("AuthViewModel", "Login success notification sent to user: $userName")
-                            } else {
-                                Log.w("AuthViewModel", "Failed to send login success notification")
-                            }
-                        } catch (e: Exception) {
-                            Log.e("AuthViewModel", "Error sending login notification: ${e.message}")
+                    if (user.lock == "active"){
+//                        isSignUpSuccess = true
+//                        authError = null
+                        val sharedPref = context.getSharedPreferences("user_session", Context.MODE_PRIVATE)
+                        val userId = user.id
+                        val userName = user.name
+                        sharedPref.edit {
+                            putString("user_id", userId)
+                            putString("username", userName)
                         }
-                    }
 
-                    // Generate and upload FCM token for push notifications
-                    withContext(Dispatchers.Main) {
-                        authRepository.uploadFcmToken(context, userId)
-                    }
+                        // Gửi thông báo đăng nhập thành công và generate FCM token
+                        launch {
+                            try {
+                                val success = notificationService.sendLoginSuccessNotification(userId, userName)
+                                if (success) {
+                                    Log.d("AuthViewModel", "Login success notification sent to user: $userName")
+                                } else {
+                                    Log.w("AuthViewModel", "Failed to send login success notification")
+                                }
+                            } catch (e: Exception) {
+                                Log.e("AuthViewModel", "Error sending login notification: ${e.message}")
+                            }
+                        }
 
-                    withContext(Dispatchers.Main) {
-                        onSuccess()
+                        // Generate and upload FCM token for push notifications
+                        withContext(Dispatchers.Main) {
+                            authRepository.uploadFcmToken(context, userId)
+                        }
+
+                        withContext(Dispatchers.Main) {
+                            onSuccess()
+                        }
+                    }else{
+                        authError = "Tài khoản đã bị khoá. Vui lòng liên hệ quản trị viên qua email abc@gmail.com."
                     }
                 }else{
                     Log.e("AuthViewModel", "Sign in failed - No user returned")
