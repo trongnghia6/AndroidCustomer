@@ -61,5 +61,5 @@ interface ApiService {
     suspend fun refundCapture(@Path("captureID") captureID: String, @Body request: RefundRequest): RefundResponse
 
     @POST("payout")
-    suspend fun createPayout(@Body request: com.example.customerapp.core.network.PayoutRequest): PayoutResponse
+    suspend fun createPayout(@Body request: PayoutRequest): PayoutResponse
 }
