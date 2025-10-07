@@ -44,6 +44,8 @@ import com.example.customerapp.ui.services.ProviderDetailScreen
 import com.example.customerapp.ui.services.ServiceDetailScreen
 import com.example.customerapp.ui.profile.AvatarChangeScreen
 import com.example.customerapp.ui.profile.UserProfileView
+import com.example.customerapp.ui.reports.ReportListScreen
+import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.postgrest.from
 
 @RequiresApi(Build.VERSION_CODES.TIRAMISU)
@@ -105,7 +107,8 @@ fun HomeScreenWrapper(
                         onLogout = onLogout,
                         onAvatarClick = {
                             internalNavController.navigate("avatar_change")
-                        }
+                        },
+                        navController = internalNavController
                     )
                 }
 
@@ -126,6 +129,17 @@ fun HomeScreenWrapper(
                         orderId = orderId,
                         navController = internalNavController
                     )
+                }
+
+                composable("reports") {
+                    val context = LocalContext.current
+                    val userId = remember { context.getSharedPreferences("user_session", Context.MODE_PRIVATE).getString("user_id", null) }
+                    if (userId != null) {
+                        ReportListScreen(
+                            userId = userId,
+                            onBackClick = { internalNavController.popBackStack() }
+                        )
+                    }
                 }
 
                 composable("provider_detail/{providerServiceId}") { backStackEntry ->

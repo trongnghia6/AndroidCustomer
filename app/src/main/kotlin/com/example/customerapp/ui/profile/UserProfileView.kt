@@ -35,6 +35,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.core.content.ContextCompat
+import androidx.navigation.NavController
 import coil.compose.SubcomposeAsyncImage
 import com.example.customerapp.BuildConfig
 import com.example.customerapp.core.network.MapboxPlace
@@ -50,7 +51,8 @@ fun UserProfileScreen(
     viewModel: UserViewModel = viewModel(),
     geocodingService: MapboxGeocodingService,
     onLogout: () -> Unit,
-    onAvatarClick: () -> Unit = {}
+    onAvatarClick: () -> Unit = {},
+    onViewReportsClick: () -> Unit = {}
 ) {
     val user = viewModel.user
     val isEditing = viewModel.isEditing
@@ -289,7 +291,8 @@ fun UserProfileScreen(
                 // Action Buttons Card
                 ActionButtonsCard(
                     onChangePasswordClick = { isChangingPassword = true },
-                                                onLogoutClick = { viewModel.logout(context, onLogout) }
+                    onViewReportsClick = onViewReportsClick,
+                    onLogoutClick = { viewModel.logout(context, onLogout) }
                 )
 
                 Spacer(modifier = Modifier.height(100.dp))
@@ -704,6 +707,7 @@ private fun ProfileInfoCard(
 @Composable
 private fun ActionButtonsCard(
     onChangePasswordClick: () -> Unit,
+    onViewReportsClick: () -> Unit,
     onLogoutClick: () -> Unit
 ) {
     Card(
@@ -746,6 +750,26 @@ private fun ActionButtonsCard(
                 Spacer(modifier = Modifier.width(12.dp))
                 Text(
                     text = "Đổi mật khẩu",
+                    style = MaterialTheme.typography.labelLarge
+                )
+            }
+
+            Button(
+                onClick = onViewReportsClick,
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onTertiaryContainer
+                )
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Report,
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+                Text(
+                    text = "Xem báo cáo đã gửi",
                     style = MaterialTheme.typography.labelLarge
                 )
             }
@@ -985,11 +1009,15 @@ private fun ModernPasswordChangeDialog(
 @Composable
 fun UserProfileView(
     onLogout: () -> Unit = {},
-    onAvatarClick: (() -> Unit)? = null
+    onAvatarClick: (() -> Unit)? = null,
+    navController: NavController
 ) {
     UserProfileScreen(
         geocodingService = mapboxGeocodingService,
         onLogout = onLogout,
-        onAvatarClick = onAvatarClick ?: {}
+        onAvatarClick = onAvatarClick ?: {},
+        onViewReportsClick = {
+            navController.navigate("reports")
+        }
     )
 }

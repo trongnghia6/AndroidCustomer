@@ -43,6 +43,7 @@ import kotlinx.coroutines.launch
 import com.example.customerapp.core.MyFirebaseMessagingService
 import com.example.customerapp.data.repository.BookingPaypalRepository
 import com.example.customerapp.core.network.RetrofitInstance
+import com.example.customerapp.data.model.Transaction
 
 @RequiresApi(Build.VERSION_CODES.TIRAMISU)
 @Composable
@@ -312,7 +313,7 @@ fun OrderList(
                     filter {
                         eq("id", orderId) // Only allow update if current status is accepted
                     }
-                } // Refresh page after update
+                } // Refresh page after update    
             
             // Gọi payout khi cập nhật trạng thái đơn hàng thành "completed"
             if (newStatus == "completed" || newStatus == "c-confirmed") {

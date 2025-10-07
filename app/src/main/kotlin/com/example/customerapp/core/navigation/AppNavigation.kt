@@ -17,6 +17,7 @@ import com.example.customerapp.ui.profile.AvatarScreen
 import com.example.customerapp.ui.suggestion.MapboxSuggestionScreen
 import com.example.customerapp.ui.home.HomeScreenWrapper
 import com.example.customerapp.ui.notifications.NotificationScreen
+import com.example.customerapp.ui.reports.ReportListScreen
 import io.github.jan.supabase.auth.auth
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -110,6 +111,16 @@ fun AppNavigation(initialRoute: String? = null) {
         composable("notifications") {
             NotificationScreen(
                 navController = navController
+            )
+        }
+
+        composable("reports") {
+            val userId = supabase.auth.currentSessionOrNull()?.user?.id ?: return@composable
+            ReportListScreen(
+                userId = userId,
+                onBackClick = {
+                    navController.popBackStack()
+                }
             )
         }
     }

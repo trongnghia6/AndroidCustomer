@@ -103,3 +103,15 @@ data class ReportInsert(
     val imageUrls: List<String>? = null,
     val status: String = "pending"
 )
+
+enum class ReportStatus(val value: String) {
+    PENDING("pending"),
+    PROCESSING("processing"),
+    RESOLVED("resolved"),
+    REJECTED("rejected");
+
+    companion object {
+        fun from(status: String?): ReportStatus =
+            values().find { it.value.equals(status, ignoreCase = true) } ?: PENDING
+    }
+}
