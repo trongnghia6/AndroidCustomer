@@ -51,18 +51,18 @@ class AuthViewModel : ViewModel() {
                         }
 
                         // Gửi thông báo đăng nhập thành công và generate FCM token
-                        launch {
-                            try {
-                                val success = notificationService.sendLoginSuccessNotification(userId, userName)
-                                if (success) {
-                                    Log.d("AuthViewModel", "Login success notification sent to user: $userName")
-                                } else {
-                                    Log.w("AuthViewModel", "Failed to send login success notification")
-                                }
-                            } catch (e: Exception) {
-                                Log.e("AuthViewModel", "Error sending login notification: ${e.message}")
-                            }
-                        }
+//                        launch {
+//                            try {
+//                                val success = notificationService.sendLoginSuccessNotification(userId, userName)
+//                                if (success) {
+//                                    Log.d("AuthViewModel", "Login success notification sent to user: $userName")
+//                                } else {
+//                                    Log.w("AuthViewModel", "Failed to send login success notification")
+//                                }
+//                            } catch (e: Exception) {
+//                                Log.e("AuthViewModel", "Error sending login notification: ${e.message}")
+//                            }
+//                        }
 
                         // Generate and upload FCM token for push notifications
                         withContext(Dispatchers.Main) {

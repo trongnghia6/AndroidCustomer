@@ -71,27 +71,27 @@ fun HomeScreen(
         topBar = {
             TopAppBar(
                 title = { Text("Home") },
-                navigationIcon = {
-                    IconButton(onClick = { expanded = true }) {
-                        Icon(Icons.Default.Menu, contentDescription = "Menu")
-                    }
-                    DropdownMenu(
-                        expanded = expanded,
-                        onDismissRequest = { expanded = false }
-                    ) {
-                        DropdownMenuItem(
-                            text = { Text("Đăng xuất") },
-                            onClick = {
-                                expanded = false
-                                // Sử dụng AuthViewModel để logout hoàn chỉnh
-                                val authViewModel = AuthViewModel()
-                                authViewModel.logout(context) {
-                                    onLogout()
-                                }
-                            }
-                        )
-                    }
-                },
+//                navigationIcon = {
+//                    IconButton(onClick = { expanded = true }) {
+//                        Icon(Icons.Default.Menu, contentDescription = "Menu")
+//                    }
+//                    DropdownMenu(
+//                        expanded = expanded,
+//                        onDismissRequest = { expanded = false }
+//                    ) {
+//                        DropdownMenuItem(
+//                            text = { Text("Đăng xuất") },
+//                            onClick = {
+//                                expanded = false
+//                                // Sử dụng AuthViewModel để logout hoàn chỉnh
+//                                val authViewModel = AuthViewModel()
+//                                authViewModel.logout(context) {
+//                                    onLogout()
+//                                }
+//                            }
+//                        )
+//                    }
+//                },
                 actions = {
                     
                     NotificationIconWithBadge(

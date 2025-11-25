@@ -7,6 +7,7 @@ import com.example.customerapp.data.model.NotificationInsert
 import com.example.customerapp.data.model.NotificationUpdate
 import io.github.jan.supabase.postgrest.postgrest
 import io.github.jan.supabase.postgrest.query.Columns
+import io.github.jan.supabase.postgrest.query.Count
 import io.github.jan.supabase.postgrest.query.Order
 
 class NotificationRepository {
@@ -31,22 +32,31 @@ class NotificationRepository {
             emptyList()
         }
     }
-    
+
     suspend fun getUnreadCount(userId: String): Int {
         return try {
             val result = supabase.postgrest
                 .from("notifications")
-                .select(columns = Columns.list("id")){
+                .select(columns = Columns.list("id")) { // 1. Chỉ lấy cột ID
+
+                    // 2. Đưa lệnh đếm vào TRONG ngoặc nhọn
+                    count(Count.EXACT)
+
                     filter {
                         eq("user_id", userId)
                         eq("is_read", false)
                     }
+
+                    // 3. Giới hạn tải về 0 dòng (chỉ lấy số đếm header)
+                    range(0, 0)
                 }
-                .decodeList<Map<String, String>>()
-            
-            result.size
+
+            // 4. Lấy kết quả đếm từ Header
+            Log.d("NotificationRepo", "Unread count for user $userId: ${result}")
+            result.countOrNull()?.toInt() ?: 0
+
         } catch (e: Exception) {
-            Log.e("NotificationRepo", "Error fetching unread count: ${e.message}")
+            Log.e("NotificationRepo", "Lỗi đếm: ${e.message}")
             0
         }
     }
