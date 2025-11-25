@@ -299,6 +299,8 @@ fun OrderList(
     onRefresh: (() -> Unit)? = null
 ) {
     val providerRepo = remember { ProviderServiceRepository() }
+    // [Tối ưu 5 - Thuật toán] Cache tên provider theo provider_service_id để tránh Supabase call lặp lại khi render list
+    val providerNameCache = remember { mutableStateMapOf<Int, String>() }
     val bookingPaypalRepo = remember { BookingPaypalRepository(RetrofitInstance.api) }
     var isUpdating by remember { mutableStateOf<Long?>(null) }
     
@@ -352,10 +354,12 @@ fun OrderList(
     } else {
         LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             items(orderList) { order ->
-                var providerName by remember { mutableStateOf<String?>(null) }
+                val providerName = providerNameCache[order.provider_service_id]
                 LaunchedEffect(order.provider_service_id) {
-                    val provider = providerRepo.getProviderServiceById(order.provider_service_id)
-                    providerName = provider?.user?.name ?: "Không rõ"
+                    if (!providerNameCache.contains(order.provider_service_id)) {
+                        val provider = providerRepo.getProviderServiceById(order.provider_service_id)
+                        providerNameCache[order.provider_service_id] = provider?.user?.name ?: "Không rõ"
+                    }
                 }
                 val statusText = when (order.status) {
                     "pending" -> "Chờ xác nhận"
@@ -486,6 +490,7 @@ fun ReviewList(
     onReviewSubmit: (Long, Int, String?) -> Unit
 ) {
     val providerRepo = remember { ProviderServiceRepository() }
+    val providerNameCache = remember { mutableStateMapOf<Int, String>() }
     if (orderList.isEmpty()) {
         Column(
             modifier = Modifier.fillMaxSize(),
@@ -509,10 +514,12 @@ fun ReviewList(
     } else {
         LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             items(orderList) { order ->
-                var providerName by remember { mutableStateOf<String?>(null) }
+                val providerName = providerNameCache[order.provider_service_id]
                 LaunchedEffect(order.provider_service_id) {
-                    val provider = providerRepo.getProviderServiceById(order.provider_service_id)
-                    providerName = provider?.user?.name ?: "Không rõ"
+                    if (!providerNameCache.contains(order.provider_service_id)) {
+                        val provider = providerRepo.getProviderServiceById(order.provider_service_id)
+                        providerNameCache[order.provider_service_id] = provider?.user?.name ?: "Không rõ"
+                    }
                 }
                 val review = reviews.find { it.bookingId == order.id }
                 Card(

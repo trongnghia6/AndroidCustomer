@@ -22,17 +22,39 @@ class NotificationViewModel(
     
     var isLoading by mutableStateOf(false)
         private set
+
+    var isAppending by mutableStateOf(false)
+        private set
+
+    var hasMore by mutableStateOf(true)
+        private set
     
     var errorMessage by mutableStateOf<String?>(null)
         private set
+
+    private val pageSize = 20
+    private var currentOffset = 0
     
-    fun loadNotifications(userId: String) {
+    fun loadNotifications(userId: String, refresh: Boolean = false) {
+        if (isLoading) return
         viewModelScope.launch {
+            if (refresh) {
+                currentOffset = 0
+                hasMore = true
+                notifications = emptyList()
+            }
             isLoading = true
             errorMessage = null
             
             try {
-                notifications = repository.getNotifications(userId)
+                val chunk = repository.getNotifications(
+                    userId = userId,
+                    limit = pageSize,
+                    offset = currentOffset
+                )
+                notifications = if (currentOffset == 0) chunk else notifications + chunk
+                currentOffset = notifications.size
+                hasMore = chunk.size == pageSize
                 unreadCount = repository.getUnreadCount(userId)
             } catch (e: Exception) {
                 errorMessage = "Lỗi khi tải thông báo: ${e.message}"
@@ -41,64 +63,113 @@ class NotificationViewModel(
             }
         }
     }
+
+    fun loadMoreNotifications(userId: String) {
+        if (isLoading || isAppending || !hasMore) return
+        viewModelScope.launch {
+            isAppending = true
+            try {
+                val chunk = repository.getNotifications(
+                    userId = userId,
+                    limit = pageSize,
+                    offset = currentOffset
+                )
+                notifications = notifications + chunk
+                currentOffset = notifications.size
+                hasMore = chunk.size == pageSize
+            } catch (e: Exception) {
+                errorMessage = "Lỗi khi tải thêm thông báo: ${e.message}"
+            } finally {
+                isAppending = false
+            }
+        }
+    }
     
     fun markAsRead(notificationId: String, userId: String) {
+        // [Tối ưu 6 - Phản hồi] Optimistic update để UI phản hồi ngay, rollback nếu API lỗi
+        val previousList = notifications
+        val previousUnread = unreadCount
+        val target = previousList.find { it.id == notificationId } ?: return
+        if (target.isRead) return
+
+        notifications = previousList.map { notification ->
+            if (notification.id == notificationId) notification.copy(isRead = true) else notification
+        }
+        unreadCount = (previousUnread - 1).coerceAtLeast(0)
+
         viewModelScope.launch {
             try {
                 val success = repository.markAsRead(notificationId)
-                if (success) {
-                    // Cập nhật local state
-                    notifications = notifications.map { notification ->
-                        if (notification.id == notificationId) {
-                            notification.copy(isRead = true)
-                        } else {
-                            notification
-                        }
-                    }
-                    // Cập nhật unread count
-                    unreadCount = repository.getUnreadCount(userId)
+                if (!success) {
+                    notifications = previousList
+                    unreadCount = previousUnread
                 }
             } catch (e: Exception) {
+                notifications = previousList
+                unreadCount = previousUnread
                 errorMessage = "Lỗi khi đánh dấu đã đọc: ${e.message}"
             }
         }
     }
     
     fun markAllAsRead(userId: String) {
+        if (notifications.isEmpty() || unreadCount == 0) return
+        // [Tối ưu 6 - Phản hồi] Đánh dấu tất cả bằng optimistic update để tránh chờ network
+        val previousList = notifications
+        val previousUnread = unreadCount
+        notifications = notifications.map { it.copy(isRead = true) }
+        unreadCount = 0
+
         viewModelScope.launch {
             try {
                 val success = repository.markAllAsRead(userId)
-                if (success) {
-                    // Cập nhật local state
-                    notifications = notifications.map { it.copy(isRead = true) }
-                    unreadCount = 0
+                if (!success) {
+                    notifications = previousList
+                    unreadCount = previousUnread
                 }
             } catch (e: Exception) {
+                notifications = previousList
+                unreadCount = previousUnread
                 errorMessage = "Lỗi khi đánh dấu tất cả đã đọc: ${e.message}"
             }
         }
     }
     
     fun deleteNotification(notificationId: String, userId: String) {
+        // [Tối ưu 6 - Phản hồi] Xóa thông báo theo optimistic update để tránh giật lag
+        val previousList = notifications
+        val previousUnread = unreadCount
+        val previousOffset = currentOffset
+        val target = previousList.find { it.id == notificationId } ?: return
+
+        notifications = previousList.filter { it.id != notificationId }
+        if (!target.isRead) {
+            unreadCount = (previousUnread - 1).coerceAtLeast(0)
+        }
+        currentOffset = notifications.size
+
         viewModelScope.launch {
             try {
                 val success = repository.deleteNotification(notificationId)
-                if (success) {
-                    // Cập nhật local state
-                    notifications = notifications.filter { it.id != notificationId }
-                    unreadCount = repository.getUnreadCount(userId)
+                if (!success) {
+                    notifications = previousList
+                    unreadCount = previousUnread
+                    currentOffset = previousOffset
                 }
             } catch (e: Exception) {
+                notifications = previousList
+                unreadCount = previousUnread
+                currentOffset = previousOffset
                 errorMessage = "Lỗi khi xóa thông báo: ${e.message}"
             }
         }
     }
     
     fun refreshNotifications(userId: String) {
-        loadNotifications(userId)
+        loadNotifications(userId, refresh = true)
     }
     
     fun clearError() {
         errorMessage = null
     }
-} 
+}

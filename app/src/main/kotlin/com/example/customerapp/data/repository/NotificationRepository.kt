@@ -11,15 +11,21 @@ import io.github.jan.supabase.postgrest.query.Order
 
 class NotificationRepository {
     
-    suspend fun getNotifications(userId: String): List<Notification> {
+    suspend fun getNotifications(
+        userId: String,
+        limit: Int,
+        offset: Int
+    ): List<Notification> {
         return try {
             val result = supabase.postgrest
                 .from("notifications")
-                .select(columns = Columns.list("*")){
+                // [Tối ưu 3 - Dữ liệu phù hợp] Chỉ lấy cột cần thiết + limit/offset để giảm payload mỗi request
+                .select(columns = Columns.list("id,title,body,type,data,is_read,created_at")){
                     filter {
                         eq("user_id", userId)
                     }
                     order(column = "created_at", order = Order.DESCENDING)
+                    range(offset.toLong(), (offset + limit - 1).toLong())
                 }
 
                 .decodeList<Notification>()

@@ -1,0 +1,198 @@
+Ghi chú tối ưu hoá đệ quy (24/11/2025)
+======================================
+
+Mục tiêu
+--------
+- Áp dụng guideline “Hạn chế dùng đệ quy” bằng cách đảm bảo ứng dụng Android không dựa vào thuật toán đệ quy ở các khu vực nhạy cảm (điều hướng, chat, đơn hàng, báo cáo, lịch công việc).
+- Giữ nguyên luồng nghiệp vụ và logic hiện tại.
+
+Khu vực đã kiểm tra
+-------------------
+1. Điều hướng & entry (`MainActivity`, `AppNavigation`, `HomeScreenWrapper`) – toàn bộ đều dùng NavController theo hướng lặp, không có hàm tự gọi.
+2. Repository/domain (`HomeViewModel`, `ServiceDetailViewModel`, `ProviderServiceRepository`, `BookingPaypalRepository`, `ChatRepository`, `TaskViewModel`) – mọi thao tác chỉ lặp qua collection hoặc gọi Supabase, không xây dựng traversal đệ quy.
+3. Các màn hình UI nặng (`OrdersScreen`, `OrderDetailScreen`, `NotificationScreen`, `ReportListScreen`, `ReportDetailDialog`, nhóm Avatar) – Compose kết hợp qua `LazyColumn`, `Row`, v.v... không composable nào tự gọi chính nó.
+4. Edge Function Supabase (`supabase/functions/send-booking-notification`, `send-message-notification`, `send-push`) – luồng điều khiển dùng vòng lặp/promises, không có handler đệ quy.
+
+Kết quả
+-------
+- Không phát hiện triển khai đệ quy trong những phần code có khả năng chạy trên dữ liệu lớn hoặc sâu.
+- Vì mọi logic đã dùng cách tiếp cận lặp (loop, stack, coroutine flow), không cần chỉnh sửa thêm để đáp ứng guideline.
+
+Khuyến nghị
+-----------
+1. Nếu tương lai cần duyệt cây/đồ thị (ví dụ comment lồng nhau, dịch vụ phân cấp), ưu tiên `ArrayDeque`/stack hoặc queue BFS thay vì DFS đệ quy.
+2. Với trigger/edge function Supabase có thể chạy lặp lại cùng bản ghi, nên dùng vòng lặp có giới hạn số lần retry để tránh “đệ quy gián tiếp”.
+3. Khi thêm helper mới có khả năng tự gọi, hãy bổ sung test/unit-check hoặc tài liệu nhắc rõ giới hạn depth.
+
+Xác nhận
+--------
+- Lệnh tìm kiếm: `rg -Pn "fun\\s+([A-Za-z0-9_]+)[^{]*\\{[\\s\\S]{0,400}\\1\\(" app supabase` (không có kết quả).
+- Soát thủ công các file quan trọng nêu trên.
+
+Hướng tiếp theo
+---------------
+- Nếu trong tương lai xuất hiện tính năng thật sự cần traversal sâu (ví dụ threading chat, phụ thuộc nhiệm vụ), hãy thiết kế thuật toán dạng loop/stack trước rồi ghi chú bổ sung trong file này.
+
+
+Tối ưu 2: Bộ nhớ đệm (24/11/2025)
+================================
+
+Mục tiêu
+--------
+- Giảm số lần gọi Supabase/Mapbox lặp lại khi người dùng chuyển tab, vào/ra màn hình nhiều lần.
+- Bảo toàn luồng hiện tại nhưng cung cấp lớp cache TTL ngắn để hạn chế dữ liệu stale.
+
+Các thay đổi
+-----------
+1. `HomeViewModel`
+   - Bổ sung cache in-memory (TTL 5 phút) cho danh sách `ServiceType` và danh sách dịch vụ theo `service_type_id`.
+   - Hàm `loadServiceTypes()` và `loadServicesByType()` nhận tham số `forceRefresh` để cho phép ép làm mới khi cần.
+2. `ProviderServiceRepository`
+   - Thêm cache ConcurrentHashMap với TTL 5 phút cho:
+     * chi tiết `ProviderService` theo id,
+     * danh sách provider theo service.
+   - Mặc định đọc từ cache, có thể ép tải mới bằng `forceRefresh`.
+
+Lợi ích
+-------
+- Giảm round-trip Supabase khi người dùng mở lại Home/Orders/Reviews nhiều lần trong 1 session.
+- Độ trễ UI dễ chịu hơn vì dữ liệu phổ biến được trả về ngay từ RAM.
+
+Rủi ro & lưu ý
+--------------
+- TTL cố định 5 phút ⇒ có thể xuất hiện dữ liệu hơi cũ. Đã cung cấp cờ `forceRefresh` để view model/ repo khác có thể nạp mới khi phát hiện thay đổi quan trọng.
+- Cache nằm ở companion object ⇒ cần gọi `clearCache()` khi user logout hoặc khi muốn làm mới toàn bộ.
+
+Kiểm chứng
+----------
+- Thử load Home → chọn service type → quay lại → mở lại: dữ liệu lấy từ cache, không log thêm request Supabase trong Logcat.
+- Bằng chứng mã: `app/src/main/kotlin/com/example/customerapp/ui/home/HomeViewModel.kt`, `app/src/main/kotlin/com/example/customerapp/data/repository/ProviderServiceRepository.kt`.
+
+
+Tối ưu 3: Dữ liệu có kích thước phù hợp (24/11/2025)
+===================================================
+
+Mục tiêu
+--------
+- Giảm tải lượng dữ liệu mỗi lần gọi Supabase, tránh load toàn bộ thông báo lớn và tránh trả về các cột không dùng.
+- Cải thiện UX ở màn hình thông báo bằng phân trang + “tải thêm”, hạn chế nguy cơ OOM trên thiết bị yếu.
+
+Các thay đổi
+-----------
+1. `NotificationRepository`
+   - Hàm `getNotifications` mới nhận `limit` + `offset`, dùng `range` để chỉ lấy tối đa 20 bản ghi/lần và chỉ chọn các cột cần thiết (`id,title,body,type,data,is_read,created_at`).
+2. `NotificationViewModel`
+   - Bổ sung state phân trang (`pageSize=20`, `currentOffset`, `hasMore`, `isAppending`).
+   - `loadNotifications(userId, refresh)` thay thế luồng cũ, tự động reset offset khi refresh.
+   - Thêm `loadMoreNotifications` gọi repository với offset tương ứng; giữ lại danh sách cũ và chỉ nối thêm chunk mới.
+3. `NotificationScreen`
+   - `LazyColumn` hiển thị thêm item cuối: nếu đang tải thêm → spinner; nếu còn dữ liệu → nút “Tải thêm”.
+   - Nút refresh vẫn hoạt động nhưng nay gọi `viewModel.refreshNotifications()` để reset kích thước dữ liệu.
+
+Lợi ích
+-------
+- Mỗi lần truy vấn thông báo chỉ tải tối đa 20 hàng → giảm băng thông và thời gian render.
+- Người dùng có điều khiển rõ ràng (“Tải thêm”) và không bị freeze khi tài khoản có hàng trăm thông báo.
+- Do chỉ chọn các cột cần thiết, payload nhỏ hơn, tránh truyền dữ liệu JSON lớn không dùng.
+
+Rủi ro & lưu ý
+--------------
+- Nếu backend thêm field mới cần hiển thị thì phải cập nhật danh sách column trong `NotificationRepository`.
+- Khi xoá thông báo ở giữa, `currentOffset` được cập nhật bằng `notifications.size`; nếu backend xoá dữ liệu cùng lúc ở nơi khác có thể bị bỏ sót/ trùng lặp nhẹ, nhưng có thể giải quyết bằng `refresh`.
+
+Kiểm chứng
+----------
+- Kiểm tra thủ công: mở màn hình thông báo → thấy 20 item đầu và nút “Tải thêm”; sau khi nhấn, log Supabase chỉ ghi range tiếp theo; không còn tải toàn bảng.
+- Mã nguồn: `app/src/main/kotlin/com/example/customerapp/data/repository/NotificationRepository.kt`, `app/src/main/kotlin/com/example/customerapp/ui/notifications/NotificationViewModel.kt`, `app/src/main/kotlin/com/example/customerapp/ui/notifications/NotificationScreen.kt`.
+
+
+Tối ưu 4: Cấp độ API (24/11/2025)
+=================================
+
+Mục tiêu
+--------
+- Đảm bảo ứng dụng tuân thủ yêu cầu permission mới trên Android 13+ (POST_NOTIFICATIONS) trong khi vẫn hoạt động bình thường ở các API thấp hơn.
+
+Các thay đổi
+-----------
+1. `MainActivity`
+   - Thêm `requestNotificationPermissionIfNeeded()` được gọi trong `onCreate`. Hàm chỉ chạy khi `Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU` và yêu cầu quyền `Manifest.permission.POST_NOTIFICATIONS` nếu chưa được cấp.
+   - Ghi đè `onRequestPermissionsResult` để log kết quả, hỗ trợ theo dõi trên device farm/Logcat.
+
+Lợi ích
+-------
+- Push notification không bị silent trên các thiết bị chạy Android 13+ vì hệ thống đã được xin quyền ngay lần đầu mở app.
+- Thiết bị cũ (API < 33) không bị ảnh hưởng vì nhánh permission mới không chạy.
+
+Rủi ro & lưu ý
+--------------
+- Cần test hành vi trên nhiều API level: nếu người dùng từ chối quyền, push sẽ không hiển thị → app nên cân nhắc nhắc lại quyền ở nơi khác (tương lai).
+- Nếu sau này có thêm API mới (ví dụ photo picker mới, foreground service type), áp dụng cùng pattern kiểm tra `Build.VERSION`.
+
+Kiểm chứng
+----------
+- Emulator API 34: app hiển thị dialog xin POST_NOTIFICATIONS khi khởi động, Logcat ghi `POST_NOTIFICATIONS granted=true/false`.
+- Mã nguồn: `app/src/main/kotlin/com/example/customerapp/MainActivity.kt`.
+
+
+Tối ưu 5: Thuật toán & cấu trúc dữ liệu (24/11/2025)
+====================================================
+
+Mục tiêu
+--------
+- Giảm số lần truy vấn Supabase lặp lại trong `OrdersScreen`, vốn trước đây gọi API theo kiểu O(n) mỗi khi danh sách render (mỗi `order` lại fetch provider riêng).
+- Dùng cấu trúc dữ liệu phù hợp (hash map) để cache tên provider theo `provider_service_id`, tránh vòng lặp lồng nhau và IO thừa.
+
+Các thay đổi
+-----------
+1. `OrderList` & `ReviewList`
+   - Thêm `mutableStateMapOf<Int, String>()` (`providerNameCache`) lưu tên provider cho từng `provider_service_id`.
+   - Mỗi item chỉ gọi `ProviderServiceRepository.getProviderServiceById` nếu cache chưa có; kết quả được tái sử dụng cho mọi đơn hàng khác có cùng dịch vụ.
+   - Loại bỏ biến `providerName` riêng lẻ và `LaunchedEffect` lặp lại vô hạn (trước kia setState mỗi lần recomposition → nguy cơ n lần fetch).
+
+Lợi ích
+-------
+- Thời gian tải danh sách đơn hàng/đánh giá giảm đáng kể khi có nhiều mục cùng nhà cung cấp: thay vì n request, còn tối đa k request với k = số provider khác nhau.
+- Tránh việc Supabase bị spam khi `OrderList` recompose (chuyển tab, lọc…) vì cache vẫn giữ kết quả trong phiên.
+
+Rủi ro & lưu ý
+--------------
+- Cache sống trong vòng đời composable; khi người dùng rời màn hình, cache bị tạo lại (chấp nhận được vì dữ liệu nhỏ).
+- Nếu tên provider thay đổi trong thời gian ngắn, người dùng cần thao tác refresh để lấy tên mới (vì cache in-memory). Điều này phù hợp với guideline TTL ngắn.
+
+Kiểm chứng
+----------
+- Logcat trước/sau: khi danh sách có nhiều đơn cùng provider, sau thay đổi chỉ thấy request đầu tiên, các lần sau không còn log fetch provider.
+- Mã nguồn: `app/src/main/kotlin/com/example/customerapp/ui/orders/OrdersScreen.kt`.
+
+
+Tối ưu 6: Phản hồi nhanh / UX (24/11/2025)
+=========================================
+
+Mục tiêu
+--------
+- Làm cho thao tác với thông báo (đánh dấu đã đọc, đánh dấu tất cả, xoá) phản hồi tức thì, không phải chờ network round-trip.
+
+Các thay đổi
+-----------
+1. `NotificationViewModel`
+   - `markAsRead`, `markAllAsRead`, `deleteNotification` chuyển sang cơ chế optimistic update:
+     * Cập nhật UI và bộ đếm `unreadCount` ngay lập tức.
+     * Nếu API trả lỗi, revert lại danh sách trước đó và báo lỗi để user biết.
+   - Giữ logic gọi repository ở background coroutine, giúp main thread phản hồi nhanh và không block gesture.
+
+Lợi ích
+-------
+- Người dùng thấy trạng thái đổi ngay khi bấm (thông báo chuyển trạng thái xám hoặc biến mất), tạo cảm giác ứng dụng nhanh nhẹn hơn.
+- Do vẫn có cơ chế rollback nếu API thất bại, dữ liệu UI không bị sai lệch lâu.
+
+Rủi ro & lưu ý
+--------------
+- Khi nhiều hành động diễn ra đồng thời, trạng thái rollback có thể ghi đè thao tác kế tiếp; cần kiểm thử khi áp dụng đa chọn trong tương lai.
+- Nếu server reject vì lý do đặc biệt (ví dụ đã bị xoá ở nơi khác), UI sẽ nhảy về trạng thái cũ – đã có thông báo lỗi để user biết.
+
+Kiểm chứng
+----------
+- Manual: bấm “Đánh dấu đã đọc”/“Xóa” trên thiết bị thật → UI đổi tức thì; ngắt mạng tạm thời để xác nhận rollback + error message hoạt động.
+- Mã nguồn: `app/src/main/kotlin/com/example/customerapp/ui/notifications/NotificationViewModel.kt`.
+

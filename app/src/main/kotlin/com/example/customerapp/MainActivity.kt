@@ -1,7 +1,9 @@
 package com.example.customerapp
 
+import android.Manifest
 import android.content.Intent
-import android.net.Uri
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import android.util.Log
 import androidx.activity.ComponentActivity
@@ -10,17 +12,17 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
-import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import com.example.customerapp.core.navigation.AppNavigation
 import com.example.customerapp.core.paypal.PayPalDeepLinkHandler
-import com.example.customerapp.data.repository.BookingPaypalRepository
-import com.example.customerapp.ui.checkout.BookingPaypalViewModel
-import com.example.customerapp.core.network.RetrofitInstance
 
 class MainActivity : ComponentActivity() {
     
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // [Tối ưu 4 - Cấp độ API] Xin POST_NOTIFICATIONS cho API 33+ tại onCreate
+        requestNotificationPermissionIfNeeded()
         
         // Handle deep link from PayPal
         PayPalDeepLinkHandler.handleDeepLink(intent.data)
@@ -39,6 +41,20 @@ class MainActivity : ComponentActivity() {
                 ) {
                     AppNavigation(initialRoute = navigateTo)
                 }
+            }
+        }
+    }
+    
+    private fun requestNotificationPermissionIfNeeded() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            val permission = Manifest.permission.POST_NOTIFICATIONS
+            val granted = ContextCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_GRANTED
+            if (!granted) {
+                ActivityCompat.requestPermissions(
+                    this,
+                    arrayOf(permission),
+                    REQUEST_POST_NOTIFICATIONS
+                )
             }
         }
     }
@@ -67,5 +83,21 @@ class MainActivity : ComponentActivity() {
             // TODO: Trigger navigation to specific screen
             // Có thể implement thêm logic để navigate đến screen tương ứng
         }
+    }
+    
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<String>,
+        grantResults: IntArray
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == REQUEST_POST_NOTIFICATIONS) {
+            val granted = grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED
+            Log.d("MainActivity", "POST_NOTIFICATIONS granted=$granted")
+        }
+    }
+    
+    companion object {
+        private const val REQUEST_POST_NOTIFICATIONS = 2001
     }
 }
