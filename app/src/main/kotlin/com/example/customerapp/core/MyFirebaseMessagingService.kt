@@ -10,6 +10,9 @@ import android.content.BroadcastReceiver
 import android.content.IntentFilter
 import android.util.Log
 import androidx.core.app.NotificationCompat
+import androidx.work.Data
+import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.WorkManager
 import com.google.firebase.messaging.FirebaseMessaging
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
@@ -129,6 +132,14 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
         Log.d("FCM", "System notification displayed with ID: $notificationId")
     }
 
+    /**
+     * Lưu notification vào database sử dụng WorkManager
+     * Tối ưu hóa: Không thực hiện network call trực tiếp trong onMessageReceived()
+     * WorkManager sẽ:
+     * - Đảm bảo task được thực thi ngay cả khi app bị kill
+     * - Tự động retry nếu fail
+     * - Chạy trên background thread an toàn
+     */
     private fun saveNotificationToDatabase(
         userId: String, 
         title: String, 
@@ -136,53 +147,35 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
         type: String, 
         data: Map<String, String>
     ) {
-        serviceScope.launch {
-            try {
-                Log.d("FCM", "🔄 Starting to save notification to database")
-                val jsonData = JsonObject(
-                    data.mapValues { JsonPrimitive(it.value) }
-                )
-
-                val notification = NotificationInsert(
-                    userId = userId,
-                    title = title,
-                    body = body,
-                    type = type,
-                    data = jsonData
-                )
-
-                supabase.postgrest
-                    .from("notifications")
-                    .insert(notification)
-                
-                Log.d("FCM", "✅ Notification saved to database: $title")
-                
-                // Gửi broadcast để thông báo cho UI
-                val broadcastIntent = Intent(NEW_NOTIFICATION_ACTION).apply {
-                    putExtra(EXTRA_NOTIFICATION_TYPE, type)
-                    addFlags(Intent.FLAG_INCLUDE_STOPPED_PACKAGES)
-                    `package` = applicationContext.packageName
-                }
-                
-                Log.d("FCM", "📢 Preparing to send broadcasts")
-                Log.d("FCM", "📢 Broadcast details:")
-                Log.d("FCM", "   - Action: ${broadcastIntent.action}")
-                Log.d("FCM", "   - Type: $type")
-                Log.d("FCM", "   - Package: ${broadcastIntent.`package`}")
-                Log.d("FCM", "   - Flags: ${broadcastIntent.flags}")
-                
-                try {
-                    // Send global broadcast
-                    applicationContext.sendBroadcast(broadcastIntent)
-                    Log.d("FCM", "✅ Successfully sent global broadcast")
-                } catch (e: Exception) {
-                    Log.e("FCM", "❌ Failed to send broadcast: ${e.message}", e)
-                    Log.e("FCM", "Stack trace: ", e)
-                }
-            } catch (e: Exception) {
-                Log.e("FCM", "❌ Error saving notification to database: ${e.message}")
-                Log.e("FCM", "Stack trace: ", e)
+        try {
+            Log.d("FCM", "📋 Scheduling notification save task via WorkManager")
+            
+            // Chuẩn bị data cho Worker
+            val workDataBuilder = Data.Builder()
+                .putString(SaveNotificationWorker.KEY_USER_ID, userId)
+                .putString(SaveNotificationWorker.KEY_TITLE, title)
+                .putString(SaveNotificationWorker.KEY_BODY, body)
+                .putString(SaveNotificationWorker.KEY_TYPE, type)
+            
+            // Thêm data map với prefix
+            data.forEach { (key, value) ->
+                workDataBuilder.putString("${SaveNotificationWorker.KEY_DATA_PREFIX}$key", value)
             }
+            
+            // Tạo work request
+            val saveNotificationWork = OneTimeWorkRequestBuilder<SaveNotificationWorker>()
+                .setInputData(workDataBuilder.build())
+                .build()
+            
+            // Enqueue work
+            WorkManager.getInstance(applicationContext)
+                .enqueue(saveNotificationWork)
+            
+            Log.d("FCM", "✅ Notification save task scheduled successfully")
+            Log.d("FCM", "   - Work ID: ${saveNotificationWork.id}")
+            
+        } catch (e: Exception) {
+            Log.e("FCM", "❌ Error scheduling notification save task: ${e.message}", e)
         }
     }
 
