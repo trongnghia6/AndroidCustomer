@@ -41,7 +41,7 @@ fun NotificationScreen(
 
     LaunchedEffect(userId) {
         if (userId.isNotEmpty()) {
-            viewModel.loadNotifications(userId)
+            viewModel.loadNotifications(userId, refresh = true)
         }
     }
 
@@ -110,6 +110,32 @@ fun NotificationScreen(
                                 onMarkAsRead = { viewModel.markAsRead(notification.id, userId) },
                                 onDelete = { viewModel.deleteNotification(notification.id, userId) }
                             )
+                        }
+                        
+                        item {
+                            when {
+                                viewModel.isAppending -> {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(vertical = 16.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        CircularProgressIndicator()
+                                    }
+                                }
+                                viewModel.hasMore -> {
+                                    // [Tối ưu 6 - Phản hồi] Cho phép user bấm "Tải thêm" thay vì chờ load để UI phản hồi nhanh
+                                    TextButton(
+                                        onClick = { viewModel.loadMoreNotifications(userId) },
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(vertical = 8.dp)
+                                    ) {
+                                        Text("Tải thêm")
+                                    }
+                                }
+                            }
                         }
                     }
                 }

@@ -10,6 +10,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import com.example.customerapp.core.supabase
+import com.example.customerapp.data.repository.ChatRepository
 import com.example.customerapp.data.repository.NotificationService
 import android.util.Log
 import androidx.core.content.edit
@@ -50,19 +51,15 @@ class AuthViewModel : ViewModel() {
                             putString("username", userName)
                         }
 
-                        // Gửi thông báo đăng nhập thành công và generate FCM token
-//                        launch {
-//                            try {
-//                                val success = notificationService.sendLoginSuccessNotification(userId, userName)
-//                                if (success) {
-//                                    Log.d("AuthViewModel", "Login success notification sent to user: $userName")
-//                                } else {
-//                                    Log.w("AuthViewModel", "Failed to send login success notification")
-//                                }
-//                            } catch (e: Exception) {
-//                                Log.e("AuthViewModel", "Error sending login notification: ${e.message}")
-//                            }
-//                        }
+                        //Xóa cache tin nhắn
+                        try {
+                            val chatRepository = ChatRepository(context)
+                            chatRepository.clearAllCache()
+                            Log.d("AuthViewModel", "Message cache cleared")
+                        } catch (e: Exception) {
+                            Log.w("AuthViewModel", "Could not clear message cache: ${e.message}")
+                            // Tiếp tục logout dù có lỗi
+                        }
 
                         // Generate and upload FCM token for push notifications
                         withContext(Dispatchers.Main) {
@@ -145,7 +142,17 @@ class AuthViewModel : ViewModel() {
                 val sharedPref = context.getSharedPreferences("user_session", Context.MODE_PRIVATE)
                 val userId = sharedPref.getString("user_id", null)
                 
-                // 2. Xóa FCM token khỏi database (tùy chọn)
+                // 2. Xóa cache tin nhắn
+                try {
+                    val chatRepository = ChatRepository(context)
+                    chatRepository.clearAllCache()
+                    Log.d("AuthViewModel", "Message cache cleared")
+                } catch (e: Exception) {
+                    Log.w("AuthViewModel", "Could not clear message cache: ${e.message}")
+                    // Tiếp tục logout dù có lỗi
+                }
+                
+                // 3. Xóa FCM token khỏi database (tùy chọn)
                 if (!userId.isNullOrEmpty()) {
                     try {
                         supabase.from("user_push_tokens")
@@ -161,7 +168,7 @@ class AuthViewModel : ViewModel() {
                     }
                 }
                 
-                // 3. Xóa tất cả dữ liệu SharedPreferences
+                // 4. Xóa tất cả dữ liệu SharedPreferences
                 withContext(Dispatchers.Main) {
                     sharedPref.edit{
                         clear()
@@ -169,7 +176,7 @@ class AuthViewModel : ViewModel() {
                     Log.d("AuthViewModel", "SharedPreferences cleared")
                 }
                 
-                // 4. Xóa Supabase auth session
+                // 5. Xóa Supabase auth session
                 try {
                     supabase.auth.signOut()
                     Log.d("AuthViewModel", "Supabase session cleared")
@@ -178,7 +185,7 @@ class AuthViewModel : ViewModel() {
                     // Tiếp tục logout dù có lỗi
                 }
                 
-                // 5. Reset các state variables
+                // 6. Reset các state variables
                 withContext(Dispatchers.Main) {
                     authError = null
                     isSignUpSuccess = null

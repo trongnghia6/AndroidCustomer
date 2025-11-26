@@ -29,22 +29,42 @@ class HomeViewModel : ViewModel() {
         loadServiceTypes()
     }
 
-    fun loadServiceTypes() {
+    fun loadServiceTypes(forceRefresh: Boolean = false) {
+        // [Tối ưu 2 - Bộ nhớ đệm] Cache service type ngắn hạn để tránh gọi mạng khi user quay lại màn hình Home
+        val cached = getCachedServiceTypes()
+        if (cached != null && !forceRefresh) {
+            serviceTypes = cached
+            return
+        }
+
         isLoading.value = true
         viewModelScope.launch {
-            serviceTypes = supabase.from("service_types").select().decodeList()
+            val freshData = supabase.from("service_types").select().decodeList<ServiceType>()
+            cacheServiceTypes(freshData)
+            serviceTypes = freshData
             isLoading.value = false
         }
     }
 
-    fun loadServicesByType(typeId: Int) {
+    fun loadServicesByType(typeId: Int, forceRefresh: Boolean = false) {
+        selectedTypeId = typeId
+        val cached = getCachedServices(typeId)
+        if (cached != null && !forceRefresh) {
+            services = cached
+            return
+        }
+
         isLoading.value = true
         viewModelScope.launch {
-            selectedTypeId = typeId
-            services = supabase.from("services")
-                .select()
+            val result = supabase.from("services")
+                .select {
+                    filter {
+                        eq("service_type_id", typeId)
+                    }
+                }
                 .decodeList<Service>()
-                .filter { it.serviceTypeId == typeId }
+            cacheServices(typeId, result)
+            services = result
             isLoading.value = false
         }
     }
@@ -52,5 +72,42 @@ class HomeViewModel : ViewModel() {
     fun clearSelection() {
         selectedTypeId = null
         services = emptyList()
+    }
+
+    private fun getCachedServiceTypes(): List<ServiceType>? {
+        val cacheAge = System.currentTimeMillis() - lastServiceTypeFetchTimestamp
+        return if (serviceTypesCache.isNotEmpty() && cacheAge < CACHE_TTL_MS) {
+            serviceTypesCache
+        } else {
+            null
+        }
+    }
+
+    private fun cacheServiceTypes(types: List<ServiceType>) {
+        serviceTypesCache = types
+        lastServiceTypeFetchTimestamp = System.currentTimeMillis()
+    }
+
+    private fun getCachedServices(typeId: Int): List<Service>? {
+        val entry = servicesCache[typeId] ?: return null
+        val cacheAge = System.currentTimeMillis() - entry.second
+        return if (cacheAge < CACHE_TTL_MS) entry.first else null
+    }
+
+    private fun cacheServices(typeId: Int, list: List<Service>) {
+        servicesCache[typeId] = list to System.currentTimeMillis()
+    }
+
+    companion object {
+        private const val CACHE_TTL_MS = 5 * 60 * 1000L // 5 phút
+        private var serviceTypesCache: List<ServiceType> = emptyList()
+        private var lastServiceTypeFetchTimestamp: Long = 0L
+        private val servicesCache = mutableMapOf<Int, Pair<List<Service>, Long>>()
+
+        fun clearCache() {
+            serviceTypesCache = emptyList()
+            servicesCache.clear()
+            lastServiceTypeFetchTimestamp = 0L
+        }
     }
 }

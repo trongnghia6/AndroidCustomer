@@ -21,6 +21,7 @@ import androidx.compose.material3.*
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.runtime.*
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -55,6 +56,8 @@ fun ChatScreen(
     val providerName by viewModel.providerName.collectAsState()
     val messages by viewModel.messages.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
+    val isLoadingMore by viewModel.isLoadingMore.collectAsState()
+    val hasMore by viewModel.hasMore.collectAsState()
     val error by viewModel.error.collectAsState()
     
     // Debug logs
@@ -67,16 +70,17 @@ fun ChatScreen(
     LaunchedEffect(userId, providerId) {
         viewModel.loadData(userId, providerId)
     }
-    LaunchedEffect(messages) {
+    LaunchedEffect(messages.size) {
         if (messages.isNotEmpty()) {
-            // Cuộn tới tin nhắn cuối cùng
+            // Cuộn tới tin nhắn cuối cùng khi có tin nhắn mới
             listState.animateScrollToItem(messages.lastIndex)
 
-            // Đánh dấu các tin nhắn mới từ provider là đã xem
+            // Đánh dấu các tin nhắn mới từ provider là đã xem (bỏ qua tin nhắn tạm)
             messages.filter {
                 it.senderId == providerId &&
                         it.receiverId == userId &&
-                        it.seenAt == null
+                        it.seenAt == null &&
+                        it.id?.startsWith("temp_") != true
             }.forEach { message ->
                 // Gọi suspend trực tiếp trong LaunchedEffect
                 viewModel.markMessageAsSeen(message.id ?: "", userId)
@@ -204,6 +208,35 @@ fun ChatScreen(
                                 .padding(horizontal = 16.dp, vertical = 8.dp),
                             verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
+                            // Header để load thêm tin nhắn cũ
+                            item {
+                                if (hasMore) {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(vertical = 8.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        if (isLoadingMore) {
+                                            CircularProgressIndicator(
+                                                modifier = Modifier.size(24.dp),
+                                                color = MaterialTheme.colorScheme.primary
+                                            )
+                                        } else {
+                                            TextButton(
+                                                onClick = { viewModel.loadMoreMessages() }
+                                            ) {
+                                                Text(
+                                                    text = "Tải tin nhắn cũ hơn",
+                                                    style = MaterialTheme.typography.labelMedium,
+                                                    color = MaterialTheme.colorScheme.primary
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            
                             items(messages) { message ->
                                 AnimatedVisibility(
                                     visible = true,
@@ -214,6 +247,36 @@ fun ChatScreen(
                                         message = message,
                                         isSentByUser = message.senderId == userId
                                     )
+                                }
+                            }
+                        }
+                        
+                        // Auto-load khi cuộn đến đầu list (tin cũ nhất)
+                        LaunchedEffect(listState, hasMore, isLoadingMore, messages.size) {
+                            var lastLoadTime = 0L
+                            
+                            snapshotFlow { 
+                                listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset 
+                            }.collect { (index, offset) ->
+                                // Chỉ load khi người dùng thực sự scroll đến tin nhắn cũ nhất
+                                // Item 0 = header load more
+                                // Item 1 = tin nhắn cũ nhất
+                                val shouldLoad = when {
+                                    // Đang ở header và đã scroll xuống một chút
+                                    index == 0 && offset > 100 -> true
+                                    // Đang xem tin nhắn cũ nhất (item 1) 
+                                    index == 1 -> true
+                                    else -> false
+                                }
+                                
+                                // Debounce: chỉ load nếu đã qua 1 giây từ lần load trước
+                                val currentTime = System.currentTimeMillis()
+                                val canLoad = (currentTime - lastLoadTime) > 1000
+                                
+                                if (shouldLoad && hasMore && !isLoadingMore && canLoad) {
+                                    Log.d("ChatScreen", "🔄 Auto-load triggered at index=$index, offset=$offset")
+                                    lastLoadTime = currentTime
+                                    viewModel.loadMoreMessages()
                                 }
                             }
                         }
@@ -288,7 +351,16 @@ fun ChatScreen(
 fun MessageBubble(message: Message, isSentByUser: Boolean) {
     val formattedTime = try {
         val instant = OffsetDateTime.parse(message.createdAt)
-        instant.format(DateTimeFormatter.ofPattern("HH:mm"))
+        val now = OffsetDateTime.now()
+        
+        // Kiểm tra có phải hôm nay không
+        val isToday = instant.toLocalDate() == now.toLocalDate()
+        
+        if (isToday) {
+            instant.format(DateTimeFormatter.ofPattern("HH:mm"))
+        } else {
+            instant.format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm"))
+        }
     } catch (e: Exception) {
         Log.e("MessageBubble", "❌ Lỗi định dạng thời gian: ${e.message}")
         message.createdAt
@@ -349,22 +421,35 @@ fun MessageBubble(message: Message, isSentByUser: Boolean) {
                     
                     // Hiển thị icon trạng thái chỉ cho tin nhắn người dùng gửi
                     if (isSentByUser) {
-                        if (message.seenAt != null) {
-                            // Đã xem - 2 dấu tích
-                            Icon(
-                                imageVector = Icons.Filled.DoneAll,
-                                contentDescription = "Đã xem",
-                                tint = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.8f),
-                                modifier = Modifier.size(16.dp)
-                            )
-                        } else {
-                            // Đã gửi - 1 dấu tích
-                            Icon(
-                                imageVector = Icons.Filled.Done,
-                                contentDescription = "Đã gửi",
-                                tint = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.6f),
-                                modifier = Modifier.size(16.dp)
-                            )
+                        val isSending = message.id?.startsWith("temp_") == true
+                        
+                        when {
+                            isSending -> {
+                                // Đang gửi - hiển thị loading
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(14.dp),
+                                    color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.6f),
+                                    strokeWidth = 2.dp
+                                )
+                            }
+                            message.seenAt != null -> {
+                                // Đã xem - 2 dấu tích
+                                Icon(
+                                    imageVector = Icons.Filled.DoneAll,
+                                    contentDescription = "Đã xem",
+                                    tint = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.8f),
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                            else -> {
+                                // Đã gửi - 1 dấu tích
+                                Icon(
+                                    imageVector = Icons.Filled.Done,
+                                    contentDescription = "Đã gửi",
+                                    tint = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.6f),
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
                         }
                     }
                 }
