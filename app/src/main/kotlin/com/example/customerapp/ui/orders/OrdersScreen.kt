@@ -12,7 +12,9 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Star
@@ -40,6 +42,8 @@ import io.github.jan.supabase.postgrest.query.Order
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.distinctUntilChanged
+import androidx.compose.runtime.snapshotFlow
 import com.example.customerapp.core.MyFirebaseMessagingService
 import com.example.customerapp.data.repository.BookingPaypalRepository
 import com.example.customerapp.core.network.RetrofitInstance
@@ -58,38 +62,65 @@ fun OrdersScreen(
     var selectedTab by remember { mutableIntStateOf(0) }
     val tabTitles = listOf("Đang đến", "Lịch sử", "Đã huỷ", "Đánh giá")
     val scope = rememberCoroutineScope()
+    
+    // [Tối ưu - Phân trang] Pagination states để tránh load toàn bộ đơn hàng cùng lúc
+    val pageSize = 15
+    var currentPage by remember { mutableIntStateOf(0) }
+    var hasMoreOrders by remember { mutableStateOf(true) }
+    var isLoadingMore by remember { mutableStateOf(false) }
 
-    // Function to load all data
-    suspend fun loadAll() {
-        Log.d("OrdersScreen", "Starting loadAll() function")
+    // [Tối ưu - Phân trang] Function to load orders với pagination
+    suspend fun loadOrders(isLoadMore: Boolean = false) {
+        Log.d("OrdersScreen", "Starting loadOrders() function, isLoadMore=$isLoadMore")
         try {
-            isLoading = true
-            Log.d("OrdersScreen", "Fetching bookings from Supabase")
-            orders = supabase.from("bookings").select {
+            if (!isLoadMore) {
+                isLoading = true
+                currentPage = 0
+                orders = emptyList()
+                hasMoreOrders = true
+            } else {
+                isLoadingMore = true
+            }
+            
+            // Tính range cho pagination
+            val from = currentPage * pageSize
+            val to = from + pageSize - 1
+            Log.d("OrdersScreen", "Fetching bookings from Supabase, range: $from to $to")
+            
+            val newOrders = supabase.from("bookings").select {
                 order(column = "created_at", order = Order.DESCENDING)
                 filter {
                     eq("customer_id", userId ?: "")
                 }
+                range(from.toLong(), to.toLong()) // [Tối ưu] Giới hạn số lượng record
             }.decodeList<Booking>()
-            Log.d("OrdersScreen", "Received ${orders.size} bookings from Supabase")
+            Log.d("OrdersScreen", "Received ${newOrders.size} bookings from Supabase")
             
-//            orders = bookingResult.filter { it.customer_id == userId }
-//            Log.d("OrdersScreen", "Filtered ${orders.size} bookings for user $userId")
+            // Kiểm tra còn data không
+            hasMoreOrders = newOrders.size == pageSize
             
-            Log.d("OrdersScreen", "Fetching reviews from Supabase")
-            val reviewResult = supabase.from("service_ratings").select{
-                order(column = "created_at", order = Order.DESCENDING)
-            }.decodeList<Review>()
-            Log.d("OrdersScreen", "Received ${reviewResult.size} reviews from Supabase")
+            // Append hoặc replace orders
+            orders = if (isLoadMore) orders + newOrders else newOrders
+            currentPage++
             
-            reviews = reviewResult.filter { booking -> orders.any { it.id == booking.bookingId } }
-            Log.d("OrdersScreen", "Filtered ${reviews.size} reviews for user's bookings")
+            // Load reviews cho các orders hiện có
+            if (!isLoadMore || reviews.isEmpty()) {
+                Log.d("OrdersScreen", "Fetching reviews from Supabase")
+                val reviewResult = supabase.from("service_ratings").select {
+                    order(column = "created_at", order = Order.DESCENDING)
+                }.decodeList<Review>()
+                Log.d("OrdersScreen", "Received ${reviewResult.size} reviews from Supabase")
+                
+                reviews = reviewResult.filter { review -> orders.any { it.id == review.bookingId } }
+                Log.d("OrdersScreen", "Filtered ${reviews.size} reviews for user's bookings")
+            }
         } catch (e: Exception) {
-            Log.e("OrdersScreen", "Error in loadAll: ${e.message}", e)
+            Log.e("OrdersScreen", "Error in loadOrders: ${e.message}", e)
             error = e.message
         } finally {
             isLoading = false
-            Log.d("OrdersScreen", "Completed loadAll() function")
+            isLoadingMore = false
+            Log.d("OrdersScreen", "Completed loadOrders() function")
         }
     }
 
@@ -114,7 +145,7 @@ fun OrdersScreen(
                         scope.launch {
                             try {
                                 Log.d("OrdersScreen", "🔄 Starting data reload")
-                                loadAll()
+                                loadOrders()
                                 Log.d("OrdersScreen", "✅ Data reload completed successfully")
                             } catch (e: Exception) {
                                 Log.e("OrdersScreen", "❌ Error reloading data: ${e.message}", e)
@@ -169,7 +200,7 @@ fun OrdersScreen(
     // Initial data load
     LaunchedEffect(userId) {
         if (userId != null) {
-            loadAll()
+            loadOrders()
         }
     }
 
@@ -233,7 +264,20 @@ fun OrdersScreen(
                     if (userId != null) {
                         scope.launch {
                             try {
-                                loadAll()
+                                loadOrders()
+                            } catch (e: Exception) {
+                                error = e.message
+                            }
+                        }
+                    }
+                }
+                
+                // [Tối ưu - Phân trang] Callback để load thêm đơn hàng
+                val loadMoreOrders = {
+                    if (hasMoreOrders && !isLoadingMore) {
+                        scope.launch {
+                            try {
+                                loadOrders(isLoadMore = true)
                             } catch (e: Exception) {
                                 error = e.message
                             }
@@ -245,17 +289,26 @@ fun OrdersScreen(
                     0 -> OrderList(
                         orders.filter { it.status == "pending" || it.status == "accepted" }, 
                         onOrderClick,
-                        onRefresh = refreshOrders
+                        onRefresh = refreshOrders,
+                        onLoadMore = loadMoreOrders,
+                        hasMore = hasMoreOrders,
+                        isLoadingMore = isLoadingMore
                     )
                     1 -> OrderList(
                         orders.filter { it.status == "completed" || it.status == "c-confirmed" || it.status == "p-confirmed" }, 
                         onOrderClick,
-                        onRefresh = refreshOrders
+                        onRefresh = refreshOrders,
+                        onLoadMore = loadMoreOrders,
+                        hasMore = hasMoreOrders,
+                        isLoadingMore = isLoadingMore
                     )
                     2 -> OrderList(
                         orders.filter { it.status == "cancelled" }, 
                         onOrderClick,
-                        onRefresh = refreshOrders
+                        onRefresh = refreshOrders,
+                        onLoadMore = loadMoreOrders,
+                        hasMore = hasMoreOrders,
+                        isLoadingMore = isLoadingMore
                     )
                     3 -> ReviewList(
                         orders.filter { it.status == "completed" },
@@ -298,13 +351,34 @@ fun OrdersScreen(
 fun OrderList(
     orderList: List<Booking>, 
     onOrderClick: (String) -> Unit,
-    onRefresh: (() -> Unit)? = null
+    onRefresh: (() -> Unit)? = null,
+    // [Tối ưu - Phân trang] Thêm các callback và state cho pagination
+    onLoadMore: (() -> Unit)? = null,
+    hasMore: Boolean = false,
+    isLoadingMore: Boolean = false
 ) {
     val providerRepo = remember { ProviderServiceRepository() }
     // [Tối ưu 5 - Thuật toán] Cache tên provider theo provider_service_id để tránh Supabase call lặp lại khi render list
     val providerNameCache = remember { mutableStateMapOf<Int, String>() }
     val bookingPaypalRepo = remember { BookingPaypalRepository(RetrofitInstance.api) }
     var isUpdating by remember { mutableStateOf<Long?>(null) }
+    
+    // [Tối ưu - Phân trang] LazyListState để detect scroll position
+    val listState = rememberLazyListState()
+    
+    // [Tối ưu - Phân trang] Detect khi cuộn gần cuối danh sách
+    LaunchedEffect(listState, hasMore, isLoadingMore) {
+        snapshotFlow {
+            val lastVisibleItem = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
+            val totalItems = listState.layoutInfo.totalItemsCount
+            // Load khi còn 3 item nữa là hết
+            lastVisibleItem >= totalItems - 3 && totalItems > 0
+        }.distinctUntilChanged().collect { shouldLoad ->
+            if (shouldLoad && hasMore && !isLoadingMore) {
+                onLoadMore?.invoke()
+            }
+        }
+    }
     
     // Function to update order status
     suspend fun updateOrderStatus(orderId: Long, newStatus: String) {
@@ -354,7 +428,10 @@ fun OrderList(
             )
         }
     } else {
-        LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        LazyColumn(
+            state = listState, // [Tối ưu - Phân trang] Gắn listState để detect scroll
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
             items(orderList) { order ->
                 val providerName = providerNameCache[order.provider_service_id]
                 LaunchedEffect(order.provider_service_id) {
@@ -476,6 +553,34 @@ fun OrderList(
                                     }
                                 }
                             }
+                        }
+                    }
+                }
+            }
+            
+            // [Tối ưu - Phân trang] Loading indicator khi đang tải thêm
+            if (isLoadingMore) {
+                item {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(24.dp),
+                                strokeWidth = 2.dp,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            Text(
+                                text = "Đang tải thêm...",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                         }
                     }
                 }
