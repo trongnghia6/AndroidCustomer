@@ -31,6 +31,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.tracing.Trace
 import com.example.customerapp.core.supabase
 import com.example.customerapp.data.model.Booking
 import com.example.customerapp.data.model.Review
@@ -47,6 +48,12 @@ import androidx.compose.runtime.snapshotFlow
 import com.example.customerapp.core.MyFirebaseMessagingService
 import com.example.customerapp.data.repository.BookingPaypalRepository
 import com.example.customerapp.core.network.RetrofitInstance
+import io.github.jan.supabase.postgrest.postgrest
+import io.github.jan.supabase.postgrest.rpc
+import kotlinx.coroutines.withContext
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
+
 
 @RequiresApi(Build.VERSION_CODES.TIRAMISU)
 @Composable
@@ -62,7 +69,7 @@ fun OrdersScreen(
     var selectedTab by remember { mutableIntStateOf(0) }
     val tabTitles = listOf("Đang đến", "Lịch sử", "Đã huỷ", "Đánh giá")
     val scope = rememberCoroutineScope()
-    
+
     // [Tối ưu - Phân trang] Pagination states để tránh load toàn bộ đơn hàng cùng lúc
     val pageSize = 15
     var currentPage by remember { mutableIntStateOf(0) }
@@ -70,57 +77,154 @@ fun OrdersScreen(
     var isLoadingMore by remember { mutableStateOf(false) }
 
     // [Tối ưu - Phân trang] Function to load orders với pagination
+//    suspend fun loadOrders(isLoadMore: Boolean = false) {
+//        Log.d("OrdersScreen", "Starting loadOrders() function, isLoadMore=$isLoadMore")
+//        Trace.beginSection("📡 API: Fetch Bookings with Pagination")
+//        try {
+//            if (!isLoadMore) {
+//                isLoading = true
+//                currentPage = 0
+//                orders = emptyList()
+//                hasMoreOrders = true
+//            } else {
+//                isLoadingMore = true
+//            }
+//
+//            // Tính range cho pagination
+//            val from = currentPage * pageSize
+//            val to = from + pageSize - 1
+//            Log.d("OrdersScreen", "Fetching bookings from Supabase, range: $from to $to")
+//
+//            val newOrders = supabase.from("bookings").select {
+//                order(column = "created_at", order = Order.DESCENDING)
+//                filter {
+//                    eq("customer_id", userId ?: "")
+//                }
+//                range(from.toLong(), to.toLong()) // [Tối ưu] Giới hạn số lượng record
+//            }.decodeList<Booking>()
+//            Log.d("OrdersScreen", "Received ${newOrders.size} bookings from Supabase")
+//            val startTime = System.currentTimeMillis()
+//            while (System.currentTimeMillis() - startTime < 2000) {
+//                // Giả lập xử lý nặng trong 2 giây trên luồng Main
+//                val dummy = (1..1000).map { it * it }.filter { it % 2 == 0 }
+//            }
+//
+//            // Kiểm tra còn data không
+//            hasMoreOrders = newOrders.size == pageSize
+//
+//            // Append hoặc replace orders
+//            orders = if (isLoadMore) orders + newOrders else newOrders
+//            currentPage++
+//
+//            // Load reviews cho các orders hiện có
+//            if (!isLoadMore || reviews.isEmpty()) {
+//                val bookingIds = orders.map { it.id }
+//
+//                val reviewsResult = try {
+//                    supabase.postgrest.rpc(
+//                        function = "get_ratings_by_booking_ids",
+//                        parameters = RatingRpcParams(pBookingIds = bookingIds)
+//                    ).decodeList<Review>()
+//                } finally {
+//                    Trace.endSection()
+//                }
+//                reviews = reviewsResult
+//            }
+//        } catch (e: Exception) {
+//            Log.e("OrdersScreen", "Error in loadOrders: ${e.message}", e)
+//            error = e.message
+//        } finally {
+//            isLoading = false
+//            isLoadingMore = false
+//            Log.d("OrdersScreen", "Completed loadOrders() function")
+//            Trace.endSection()
+//        }
+//    }
+
+    // Function to load all data optimized
     suspend fun loadOrders(isLoadMore: Boolean = false) {
-        Log.d("OrdersScreen", "Starting loadOrders() function, isLoadMore=$isLoadMore")
+        Log.d("OrdersScreen", "Starting loadOrders(), isLoadMore=$isLoadMore")
+
+        // 1. Cập nhật trạng thái Loading trên Main Thread trước khi chuyển sang IO
+        if (!isLoadMore) {
+            isLoading = true
+            currentPage = 0
+            orders = emptyList()
+            hasMoreOrders = true
+        } else {
+            isLoadingMore = true
+        }
+
         try {
-            if (!isLoadMore) {
-                isLoading = true
-                currentPage = 0
-                orders = emptyList()
-                hasMoreOrders = true
-            } else {
-                isLoadingMore = true
-            }
-            
-            // Tính range cho pagination
-            val from = currentPage * pageSize
-            val to = from + pageSize - 1
-            Log.d("OrdersScreen", "Fetching bookings from Supabase, range: $from to $to")
-            
-            val newOrders = supabase.from("bookings").select {
-                order(column = "created_at", order = Order.DESCENDING)
-                filter {
-                    eq("customer_id", userId ?: "")
+            // 2. Chuyển sang luồng IO cho các tác vụ nặng
+            withContext(Dispatchers.IO) {
+
+                // --- TỐI ƯU: ĐO TẢI BOOKINGS ---
+                Trace.beginSection("📡 API: Fetch Bookings")
+                val from = currentPage * pageSize
+                val to = from + pageSize - 1
+
+                val newOrders: List<Booking> = try { // Xác định kiểu List<Booking> tại đây
+                    val result = supabase.from("bookings").select {
+                        order(column = "created_at", order = Order.DESCENDING)
+                        filter { eq("customer_id", userId ?: "") }
+                        range(from.toLong(), to.toLong())
+                    }.decodeList<Booking>()
+
+                    // Đoạn xử lý nặng này hiện đang nằm an toàn ở luồng IO
+                    val startTime = System.currentTimeMillis()
+                    while (System.currentTimeMillis() - startTime < 2000) {
+                        (1..1000).map { it * it }.filter { it % 2 == 0 }
+                    }
+                    result // Trả về kết quả cho biến newOrders
+                } finally {
+                    Trace.endSection()
                 }
-                range(from.toLong(), to.toLong()) // [Tối ưu] Giới hạn số lượng record
-            }.decodeList<Booking>()
-            Log.d("OrdersScreen", "Received ${newOrders.size} bookings from Supabase")
-            
-            // Kiểm tra còn data không
-            hasMoreOrders = newOrders.size == pageSize
-            
-            // Append hoặc replace orders
-            orders = if (isLoadMore) orders + newOrders else newOrders
-            currentPage++
-            
-            // Load reviews cho các orders hiện có
-            if (!isLoadMore || reviews.isEmpty()) {
-                Log.d("OrdersScreen", "Fetching reviews from Supabase")
-                val reviewResult = supabase.from("service_ratings").select {
-                    order(column = "created_at", order = Order.DESCENDING)
-                }.decodeList<Review>()
-                Log.d("OrdersScreen", "Received ${reviewResult.size} reviews from Supabase")
-                
-                reviews = reviewResult.filter { review -> orders.any { it.id == review.bookingId } }
-                Log.d("OrdersScreen", "Filtered ${reviews.size} reviews for user's bookings")
+
+
+                // --- CẬP NHẬT DỮ LIỆU ORDERS (Chuyển về Main) ---
+                withContext(Dispatchers.Main) {
+                    Trace.beginSection("🎨 UI: Update Orders List")
+                    hasMoreOrders = newOrders.size == pageSize
+                    orders = if (isLoadMore) orders + newOrders else newOrders
+                    currentPage++
+                    Trace.endSection()
+                }
+
+                // --- BƯỚC 3: TẢI REVIEWS (RPC) ---
+                if (orders.isNotEmpty()) {
+                    Trace.beginSection("📡 API: Fetch Reviews RPC")
+                    val bookingIds = orders.map { it.id }
+
+                    val reviewsResult = try {
+                        supabase.postgrest.rpc(
+                            function = "get_ratings_by_booking_ids",
+                            parameters = RatingRpcParams(pBookingIds = bookingIds)
+                        ).decodeList<Review>()
+                    } finally {
+                        Trace.endSection()
+                    }
+
+                    // Cập nhật Reviews lên UI
+                    withContext(Dispatchers.Main) {
+                        Trace.beginSection("🎨 UI: Update Reviews")
+                        reviews = reviewsResult
+                        Trace.endSection()
+                    }
+                }
             }
         } catch (e: Exception) {
             Log.e("OrdersScreen", "Error in loadOrders: ${e.message}", e)
-            error = e.message
+            withContext(Dispatchers.Main) {
+                error = e.message
+            }
         } finally {
-            isLoading = false
-            isLoadingMore = false
-            Log.d("OrdersScreen", "Completed loadOrders() function")
+            // Đảm bảo tắt loading trên Main Thread
+            withContext(Dispatchers.Main) {
+                isLoading = false
+                isLoadingMore = false
+                Log.d("OrdersScreen", "Completed loadOrders()")
+            }
         }
     }
 
@@ -165,27 +269,21 @@ fun OrdersScreen(
 
     // Register the broadcast receiver when the screen is first created
     DisposableEffect(Unit) {
-        Log.d("OrdersScreen", "Starting DisposableEffect")
-        Log.d("OrdersScreen", "Current context: $context")
 
         val intentFilter = IntentFilter(MyFirebaseMessagingService.NEW_NOTIFICATION_ACTION)
-        Log.d("OrdersScreen", "Created IntentFilter with action: ${intentFilter.actionsIterator().asSequence().toList()}")
 
         try {
-            Log.d("OrdersScreen", "Attempting to register receiver")
             context.registerReceiver(
                 broadcastReceiver,
                 intentFilter,
                 Context.RECEIVER_NOT_EXPORTED
             )
-            Log.d("OrdersScreen", "Successfully registered broadcast receiver")
         } catch (e: Exception) {
             Log.e("OrdersScreen", "Failed to register receiver - ${e.message}")
             Log.e("OrdersScreen", "Stack trace: ", e)
         }
 
         onDispose {
-            Log.d("OrdersScreen", "Starting onDispose")
             try {
                 context.unregisterReceiver(broadcastReceiver)
                 Log.d("OrdersScreen", "Successfully unregistered receiver")
@@ -193,7 +291,6 @@ fun OrdersScreen(
                 Log.e("OrdersScreen", "Error unregistering receiver - ${e.message}")
                 Log.e("OrdersScreen", "Stack trace: ", e)
             }
-            Log.d("OrdersScreen", "Completed onDispose")
         }
     }
 
@@ -220,6 +317,35 @@ fun OrdersScreen(
             color = MaterialTheme.colorScheme.onBackground
         )
         Spacer(modifier = Modifier.height(12.dp))
+
+        val context = LocalContext.current // Lấy context để gửi broadcast
+
+        Button(
+            onClick = {
+                Log.d("TestButton", "🚀 User bấm nút Test Broadcast")
+
+                // 1. Tạo Intent giả lập giống hệt cái Service gửi ra
+                val fakeIntent = Intent(MyFirebaseMessagingService.NEW_NOTIFICATION_ACTION).apply {
+                    // Gắn dữ liệu giả để logic bên trong onReceive chạy được
+                    putExtra(MyFirebaseMessagingService.EXTRA_NOTIFICATION_TYPE, "TEST_TYPE")
+
+                    // QUAN TRỌNG: Chỉ gửi cho chính app này (Explicit Broadcast)
+                    // Giúp bảo mật hơn và khớp với receiver exported=false
+                    `package` = context.packageName
+                }
+
+                // 2. Bắn Broadcast đi
+                context.sendBroadcast(fakeIntent)
+
+                Log.d("TestButton", "✅ Đã gửi Broadcast giả lập!")
+            },
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = Color.Red) // Màu đỏ cho dễ thấy
+        ) {
+            Text("🔥 GIẢ LẬP NHẬN THÔNG BÁO")
+        }
         TabRow(
             selectedTabIndex = selectedTab,
             containerColor = MaterialTheme.colorScheme.surface,
@@ -284,7 +410,7 @@ fun OrdersScreen(
                         }
                     }
                 }
-                
+
                 when (selectedTab) {
                     0 -> OrderList(
                         orders.filter { it.status == "pending" || it.status == "accepted" }, 
@@ -365,7 +491,7 @@ fun OrderList(
     
     // [Tối ưu - Phân trang] LazyListState để detect scroll position
     val listState = rememberLazyListState()
-    
+
     // [Tối ưu - Phân trang] Detect khi cuộn gần cuối danh sách
     LaunchedEffect(listState, hasMore, isLoadingMore) {
         snapshotFlow {
@@ -379,7 +505,7 @@ fun OrderList(
             }
         }
     }
-    
+
     // Function to update order status
     suspend fun updateOrderStatus(orderId: Long, newStatus: String) {
         try {
@@ -557,7 +683,7 @@ fun OrderList(
                     }
                 }
             }
-            
+
             // [Tối ưu - Phân trang] Loading indicator khi đang tải thêm
             if (isLoadingMore) {
                 item {
@@ -815,3 +941,8 @@ fun ReviewDisplay(review: Review) {
         )
     }
 }
+@Serializable
+data class RatingRpcParams(
+    @SerialName("ids")
+    val pBookingIds: List<Long> // Tên biến phải khớp tham số SQL
+)

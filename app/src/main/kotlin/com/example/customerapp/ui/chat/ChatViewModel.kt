@@ -65,7 +65,14 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 _providerName.value = provider.name ?: "Không rõ"
 
                 // Lấy messages
+                val msgStartTime = System.currentTimeMillis()
                 val initialMessages = repository.loadChatMessages(userId, providerId, null)
+                val msgEndTime = System.currentTimeMillis()
+                val duration = msgEndTime - msgStartTime
+
+                // 2. Log kết quả đo lường
+                Log.d("SPEED_TEST", "⏱️ Load Messages mất: ${duration} ms | Số lượng: ${initialMessages.size}")
+
                 _messages.value = initialMessages
                 _hasMore.value = initialMessages.size >= pageSize
 

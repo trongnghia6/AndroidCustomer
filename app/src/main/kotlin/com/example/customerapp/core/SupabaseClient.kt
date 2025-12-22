@@ -1,17 +1,20 @@
 package com.example.customerapp.core
 
+import com.example.customerapp.core.network.RetrofitInstance.loggingInterceptor
 import io.github.jan.supabase.annotations.SupabaseInternal
 import io.github.jan.supabase.createSupabaseClient
 import io.github.jan.supabase.auth.Auth
 import io.github.jan.supabase.postgrest.Postgrest
 import io.github.jan.supabase.realtime.Realtime
 import io.github.jan.supabase.storage.Storage
-import io.ktor.client.engine.cio.CIO
 import io.ktor.client.plugins.logging.ANDROID
 import io.ktor.client.plugins.logging.LogLevel
 import io.ktor.client.plugins.logging.Logger
 import io.ktor.client.plugins.logging.Logging
 import io.ktor.client.plugins.websocket.WebSockets
+import io.ktor.client.engine.okhttp.OkHttp
+import okhttp3.OkHttpClient
+import java.util.concurrent.TimeUnit
 import kotlin.time.Duration.Companion.seconds
 
 //object SupabaseClient {
@@ -28,6 +31,12 @@ import kotlin.time.Duration.Companion.seconds
 //        Log.d("Supabase", "Supabase client initialized")
 //    }
 //}
+private val okHttpClient = OkHttpClient.Builder()
+    .addInterceptor(loggingInterceptor)
+    .connectTimeout(30, TimeUnit.SECONDS)
+    .readTimeout(30, TimeUnit.SECONDS)
+    .writeTimeout(30, TimeUnit.SECONDS)
+    .build()
 
 @OptIn(SupabaseInternal::class)
 val supabase = createSupabaseClient (
@@ -36,7 +45,11 @@ val supabase = createSupabaseClient (
 
     ){
     // 1. Truyền engine tại đây
-    httpEngine = CIO.create()
+//    httpEngine = CIO.create()
+
+    httpEngine = OkHttp.create {
+        preconfigured = okHttpClient
+    }
 
     // 2. Cấu hình thêm nếu muốn
     httpConfig {

@@ -20,7 +20,7 @@ object RetrofitInstance {
     private val ngrokUrl = localProperties.getProperty("NGROK_URL", "https://intonational-tiffiny-nonequably.ngrok-free.dev")
     private val BASE_URL = "$ngrokUrl/"
 
-    private val loggingInterceptor = HttpLoggingInterceptor().apply {
+    val loggingInterceptor = HttpLoggingInterceptor().apply {
         level = HttpLoggingInterceptor.Level.BODY
     }
 

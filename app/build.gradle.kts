@@ -111,6 +111,8 @@ dependencies {
     implementation(libs.ktor.client.auth)
     implementation(libs.ktor.client.cio)
     implementation(libs.ktor.client.websockets)
+    implementation(libs.ktor.client.okhttp)
+
 
     // Logging
     implementation(libs.slf4j.simple)
@@ -164,4 +166,5 @@ dependencies {
     
     // WorkManager for background tasks
     implementation("androidx.work:work-runtime-ktx:2.9.0")
+    implementation(libs.androidx.tracing.ktx)
 }

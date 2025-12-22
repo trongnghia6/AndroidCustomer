@@ -35,7 +35,6 @@ class ChatRepository(private val context: Context? = null) {
     // Lấy danh sách cuộc trò chuyện của user
 //    suspend fun getConversations(currentUserId: String): List<Conversation> {
 //        return try {
-//            // Lấy tất cả tin nhắn có liên quan đến user hiện tại
 //            val messages = supabase.from("messages").select {
 //                filter {
 //                    or {
@@ -61,11 +60,9 @@ class ChatRepository(private val context: Context? = null) {
 //                }
 //            }
 //
-//            // Chuyển đổi thành Conversation objects
 //            val conversations = mutableListOf<Conversation>()
 //
 //            conversationMap.forEach { (otherUserId, messageList) ->
-//                // Lấy thông tin user
 //                val otherUser = getUserById(otherUserId)
 //                if (otherUser != null) {
 //                    val lastMessage = messageList.firstOrNull() // Đã sort DESC nên first là mới nhất
@@ -94,68 +91,7 @@ class ChatRepository(private val context: Context? = null) {
 //            emptyList()
 //        }
 //    }
-//    suspend fun getConversations(currentUserId: String): List<Conversation> {
-//        return try {
-//            // 1️⃣ Lấy tin nhắn cuối cùng của từng user trò chuyện với currentUserId
-//            val lastMessages = supabase.from("messages")
-//                .select(
-//                    columns = Columns.list("id, sender_id, receiver_id, content, created_at"),
-//                    distinctOn = "least(sender_id, receiver_id), greatest(sender_id, receiver_id)"
-//                ) {
-//                    filter {
-//                        or {
-//                            eq("sender_id", currentUserId)
-//                            eq("receiver_id", currentUserId)
-//                        }
-//                    }
-//                    order("least(sender_id, receiver_id)", Order.ASCENDING)
-//                    order("greatest(sender_id, receiver_id)", Order.ASCENDING)
-//                    order("created_at", Order.DESCENDING)
-//                }
-//                .decodeList<Message>()
-//
-//            val conversations = mutableListOf<Conversation>()
-//
-//            for (msg in lastMessages) {
-//
-//                // 2️⃣ Xác định user còn lại
-//                val otherUserId = if (msg.senderId == currentUserId)
-//                    msg.receiverId ?: continue
-//                else
-//                    msg.senderId ?: continue
-//
-//                // 3️⃣ Lấy thông tin của user đó (tối ưu: cache tạm)
-//                val otherUser = getUserById(otherUserId) ?: continue
-//
-//                // 4️⃣ Đếm số tin nhắn chưa đọc từ user đó
-//                val unreadCount = supabase.from("messages")
-//                    .select(head = false, count = Count.EXACT) {
-//                        filter {
-//                            eq("sender_id", otherUserId)
-//                            eq("receiver_id", currentUserId)
-//                            isNull("seen_at")
-//                        }
-//                    }
-//                    .countOrNull()?.toInt() ?: 0
-//
-//                conversations.add(
-//                    Conversation(
-//                        otherUser = otherUser,
-//                        lastMessage = msg,
-//                        unreadCount = unreadCount,
-//                        lastMessageTime = msg.createdAt
-//                    )
-//                )
-//            }
-//
-//            // 5️⃣ Sort theo tin mới nhất
-//            conversations.sortedByDescending { it.lastMessageTime }
-//
-//        } catch (e: Exception) {
-//            Log.e("ChatRepository", "❌ Error getConversations: ${e.message}")
-//            emptyList()
-//        }
-//    }
+
     suspend fun getConversations(currentUserId: String): List<Conversation> {
         return supabase.postgrest.rpc(
             function = "get_conversations_nested",
