@@ -5,6 +5,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
+import android.os.StrictMode
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -25,6 +26,10 @@ class MainActivity : ComponentActivity() {
     
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        
+        // [Tối ưu 7 - StrictMode] Bật StrictMode trong chế độ DEBUG để phát hiện lỗi
+        enableStrictMode()
+        
         // [Tối ưu 4 - Cấp độ API] Xin POST_NOTIFICATIONS cho API 33+ tại onCreate
         requestNotificationPermissionIfNeeded()
 
@@ -61,6 +66,40 @@ class MainActivity : ComponentActivity() {
                     REQUEST_POST_NOTIFICATIONS
                 )
             }
+        }
+    }
+    
+    /**
+     * [Tối ưu 7 - StrictMode]
+     * Bật StrictMode trong chế độ DEBUG để phát hiện các vấn đề:
+     * - ThreadPolicy: Phát hiện disk reads/writes và network trên main thread
+     * - VmPolicy: Phát hiện rò rỉ bộ nhớ (Activity, Closable objects, SQLite)
+     * 
+     * Chỉ bật trong DEBUG mode để không ảnh hưởng đến production.
+     */
+    private fun enableStrictMode() {
+        if (BuildConfig.DEBUG) {
+            // Phát hiện thao tác sai trên Main Thread
+            StrictMode.setThreadPolicy(
+                StrictMode.ThreadPolicy.Builder()
+                    .detectDiskReads()      // Đọc file trên main thread
+                    .detectDiskWrites()     // Ghi file trên main thread
+                    .detectNetwork()        // Network call trên main thread
+                    .penaltyLog()           // Ghi log khi phát hiện lỗi
+                    .build()
+            )
+            
+            // Phát hiện rò rỉ bộ nhớ
+            StrictMode.setVmPolicy(
+                StrictMode.VmPolicy.Builder()
+                    .detectLeakedClosableObjects()  // Quên đóng file, stream
+                    .detectLeakedSqlLiteObjects()   // Quên đóng database cursor
+                    .detectActivityLeaks()          // Activity bị leak
+                    .penaltyLog()                   // Ghi log khi phát hiện lỗi
+                    .build()
+            )
+            
+            Log.d("MainActivity", "StrictMode enabled for DEBUG build")
         }
     }
     

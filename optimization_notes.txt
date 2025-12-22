@@ -196,3 +196,60 @@ Kiểm chứng
 - Manual: bấm “Đánh dấu đã đọc”/“Xóa” trên thiết bị thật → UI đổi tức thì; ngắt mạng tạm thời để xác nhận rollback + error message hoạt động.
 - Mã nguồn: `app/src/main/kotlin/com/example/customerapp/ui/notifications/NotificationViewModel.kt`.
 
+
+Tối ưu 7: StrictMode (22/12/2025)
+=================================
+
+Mục tiêu
+--------
+- Bật chế độ StrictMode để phát hiện các lỗi tiềm ẩn trong quá trình phát triển.
+- Phát hiện thao tác I/O và network sai luồng (chạy trên Main Thread thay vì Background).
+- Phát hiện rò rỉ bộ nhớ (memory leaks) từ Activity, Closable objects, SQLite cursors.
+
+Các thay đổi
+-----------
+1. `MainActivity`
+   - Thêm import `android.os.StrictMode`.
+   - Thêm hàm `enableStrictMode()` được gọi trong `onCreate()`.
+   - Hàm chỉ chạy khi `BuildConfig.DEBUG == true` để không ảnh hưởng production.
+
+Cấu hình StrictMode
+-------------------
+1. ThreadPolicy (Chính sách luồng):
+   - `detectDiskReads()`: Phát hiện đọc file trên main thread
+   - `detectDiskWrites()`: Phát hiện ghi file trên main thread
+   - `detectNetwork()`: Phát hiện gọi network trên main thread
+   - `penaltyLog()`: Ghi log vào Logcat khi phát hiện vi phạm
+
+2. VmPolicy (Chính sách máy ảo):
+   - `detectLeakedClosableObjects()`: Phát hiện quên đóng file, stream, cursor
+   - `detectLeakedSqlLiteObjects()`: Phát hiện quên đóng database cursor
+   - `detectActivityLeaks()`: Phát hiện Activity bị leak (không được giải phóng)
+   - `penaltyLog()`: Ghi log vào Logcat khi phát hiện vi phạm
+
+Lợi ích
+-------
+- Sớm phát hiện các thao tác sai luồng gây lag/freeze UI trong quá trình development.
+- Phát hiện memory leaks trước khi chúng gây crash hoặc OutOfMemory trên production.
+- Giúp developer tuân thủ best practices của Android về threading và resource management.
+
+Rủi ro & lưu ý
+--------------
+- StrictMode chỉ là công cụ PHÁT HIỆN lỗi, không tự động sửa lỗi.
+- Chỉ bật trong DEBUG mode, không bật trong RELEASE vì có thể ảnh hưởng performance.
+- Khi phát hiện violation, cần chuyển thao tác sang background thread (Dispatchers.IO).
+
+Cách xem kết quả
+----------------
+1. Chạy app ở DEBUG mode.
+2. Mở Logcat trong Android Studio.
+3. Lọc theo tag `StrictMode`.
+4. Thực hiện các thao tác trong app.
+5. Nếu có vi phạm, sẽ thấy log dạng:
+   `D/StrictMode: StrictMode policy violation; ~duration=45 ms: android.os.StrictMode$StrictModeDiskReadViolation`
+
+Kiểm chứng
+----------
+- Khi khởi động app ở DEBUG mode, Logcat ghi: `D/MainActivity: StrictMode enabled for DEBUG build`.
+- Mã nguồn: `app/src/main/kotlin/com/example/customerapp/MainActivity.kt`.
+
