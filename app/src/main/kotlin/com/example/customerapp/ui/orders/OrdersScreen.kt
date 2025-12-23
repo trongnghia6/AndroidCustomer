@@ -79,6 +79,7 @@ fun OrdersScreen(
             }.decodeList<Booking>()
             Log.d("OrdersScreen", "Received ${bookingResult.size} bookings from Supabase")
 
+
             orders = bookingResult
             if (orders.isNotEmpty()) {
                 val bookingIds = orders.map { it.id }
