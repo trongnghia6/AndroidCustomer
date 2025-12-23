@@ -53,6 +53,8 @@ class ChatViewModel : ViewModel() {
 
                 // Lấy messages
                 _messages.value = repository.getMessages(userId, providerId)
+                Log.d("MessageSize", "Loaded ${_messages.value.size} messages")
+
 
                 // Mark đã xem
                 repository.markMessagesAsSeen(providerId, userId)

@@ -59,7 +59,6 @@ class ChatRepository {
                     val unreadCount = messageList.count { 
                         it.receiverId == currentUserId && it.seenAt == null 
                     }
-                    
                     conversations.add(
                         Conversation(
                             otherUser = otherUser,
@@ -171,6 +170,7 @@ class ChatRepository {
                     }
                 }
                 order(column = "created_at", order = Order.ASCENDING)
+                range(0, 100000)
             }.decodeList<Message>()
         } catch (e: kotlinx.coroutines.CancellationException) {
             // Không log lỗi khi coroutine bị cancel

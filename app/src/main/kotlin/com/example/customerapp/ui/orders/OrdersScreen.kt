@@ -44,6 +44,11 @@ import com.example.customerapp.core.MyFirebaseMessagingService
 import com.example.customerapp.data.repository.BookingPaypalRepository
 import com.example.customerapp.core.network.RetrofitInstance
 import com.example.customerapp.data.model.Transaction
+import io.github.jan.supabase.postgrest.postgrest
+import io.github.jan.supabase.postgrest.rpc
+import kotlinx.coroutines.withContext
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 
 @RequiresApi(Build.VERSION_CODES.TIRAMISU)
 @Composable
@@ -68,19 +73,22 @@ fun OrdersScreen(
             Log.d("OrdersScreen", "Fetching bookings from Supabase")
             val bookingResult = supabase.from("bookings").select {
                 order(column = "created_at", order = Order.DESCENDING)
+                filter {
+                    eq("customer_id", userId ?: "")
+                }
             }.decodeList<Booking>()
             Log.d("OrdersScreen", "Received ${bookingResult.size} bookings from Supabase")
-            
-            orders = bookingResult.filter { it.customer_id == userId }
-            Log.d("OrdersScreen", "Filtered ${orders.size} bookings for user $userId")
-            
-            Log.d("OrdersScreen", "Fetching reviews from Supabase")
-            val reviewResult = supabase.from("service_ratings").select{
-                order(column = "created_at", order = Order.DESCENDING)
-            }.decodeList<Review>()
-            Log.d("OrdersScreen", "Received ${reviewResult.size} reviews from Supabase")
-            
-            reviews = reviewResult.filter { booking -> orders.any { it.id == booking.bookingId } }
+
+            orders = bookingResult
+            if (orders.isNotEmpty()) {
+                val bookingIds = orders.map { it.id }
+
+                val reviewsResult = supabase.postgrest.rpc(
+                        function = "get_ratings_by_booking_ids",
+                        parameters = RatingRpcParams(pBookingIds = bookingIds)
+                    ).decodeList<Review>()
+                    reviews = reviewsResult
+                }
             Log.d("OrdersScreen", "Filtered ${reviews.size} reviews for user's bookings")
         } catch (e: Exception) {
             Log.e("OrdersScreen", "Error in loadAll: ${e.message}", e)
@@ -701,3 +709,8 @@ fun ReviewDisplay(review: Review) {
         )
     }
 }
+@Serializable
+data class RatingRpcParams(
+    @SerialName("ids")
+    val pBookingIds: List<Long> // Tên biến phải khớp tham số SQL
+)
