@@ -172,10 +172,10 @@ fun OrdersScreen(
                     }.decodeList<Booking>()
 
                     // Đoạn xử lý nặng này hiện đang nằm an toàn ở luồng IO
-                    val startTime = System.currentTimeMillis()
-                    while (System.currentTimeMillis() - startTime < 2000) {
-                        (1..1000).map { it * it }.filter { it % 2 == 0 }
-                    }
+//                    val startTime = System.currentTimeMillis()
+//                    while (System.currentTimeMillis() - startTime < 2000) {
+//                        (1..1000).map { it * it }.filter { it % 2 == 0 }
+//                    }
                     result // Trả về kết quả cho biến newOrders
                 } finally {
                     Trace.endSection()

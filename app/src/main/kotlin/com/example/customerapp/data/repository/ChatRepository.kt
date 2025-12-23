@@ -97,7 +97,6 @@ class ChatRepository(private val context: Context? = null) {
             function = "get_conversations_nested",
             parameters = mapOf("current_user_id" to currentUserId)
         ).decodeList<Conversation>()
-        // Supabase sẽ tự động điền JSON "otherUser" vào biến otherUser: User
     }
 
 
@@ -228,6 +227,7 @@ class ChatRepository(private val context: Context? = null) {
         // 1. Thử load từ cache trước (cả trang đầu và phân trang)
         if (messageDao != null) {
             try {
+                val startTime = System.currentTimeMillis()
                 val cachedMessages = if (lastMessage == null) {
                     // Trang đầu: lấy 20 tin nhắn mới nhất
                     Log.d("ChatRepository", "🔍 Tìm kiếm cache: trang đầu (20 tin mới nhất)")
@@ -242,6 +242,9 @@ class ChatRepository(private val context: Context? = null) {
                         limit = 20
                     )
                 }
+                val endTime = System.currentTimeMillis()
+                val duration = endTime - startTime
+                Log.d("SPEED_TEST", "⏱️ Tải ${cachedMessages.size} tin nhắn từ cache trong $duration ms")
                 
                 if (cachedMessages.isNotEmpty()) {
                     Log.d("ChatRepository", "✅ Tìm thấy ${cachedMessages.size} tin nhắn trong cache")
@@ -267,12 +270,16 @@ class ChatRepository(private val context: Context? = null) {
             }
         }
 
+        val startTimeRpc = System.currentTimeMillis()
         // 3. Gọi RPC
         val messages = supabase.postgrest.rpc(
             function = "get_chat_history",
             parameters = params
         ).decodeList<Message>()
-        
+        val endTimeRpc = System.currentTimeMillis()
+        val durationRpc = endTimeRpc - startTimeRpc
+        Log.d("SPEED_TEST", "⏱️ Tải ${messages.size} tin nhắn từ server trong $durationRpc ms")
+
         messages.forEach { message ->
             Log.d("ChatRepository", "📝 Tin nhắn tải về từ server: ${message.id} | ${message.content} | ${message.createdAt} | seen_at=${message.seenAt}")
         }
